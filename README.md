@@ -9,26 +9,55 @@ We use RBC(Reliable Broadcast) as a building block.
 Optional: use threshold signature instead of "echo and prepare"
 
 ### Message Types
-1. **AckTransaction**
-This message is used by leader to ack to follower that TX has been checked in in system.
+0. **Common Types**
+This message defines common messages shared by RPC.
 ```protobuf
-define RPC here
+message Payload {
+  string merkel_root;
+  repeated string merkel_branch;
+  bytes data;
+}
 ```
 
-2. **PrepareValue**
+1. **PrepareValue**
 This message is sent by leader and makes value known to every follower.
 ```protobuf
-define RPC here
+rpc PrepareValue (PrepareValueRequest) returns (PrepareValueResponse) {}
+
+message PrepareValueRequest {
+  Payload payload;
+}
+
+message PrepareValueResponse {}
 ```
 
-3. **EchoValue**
+2. **EchoValue**
 This message is send from everyone uppon receiving **PrepareValue**
 ```protobuf
-define RPC here
+rpc EchoValue (EchoValueRequest) returns (EchoValueResponse) {}
+
+message EchoValueRequest {
+  Payload payload;
+}
+
+message EchoValueResponse {}
 ```
 
-4. **ReadyValue**
+3. **ReadyValue**
 This message is send from everyone uppon receiving enough **EchoValue**
+```protobuf
+rpc EchoValue (EchoValueRequest) returns (EchoValueResponse) {}
+
+message ReadyValueRequest {
+  string merkel_root;
+}
+
+message ReadyValueResponse {}
+```
+
+### Application layer
+1. **GetTransactionStatus**
+This message is used by client to get TX status in the system.
 ```protobuf
 define RPC here
 ```
