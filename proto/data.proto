@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package proto;
+
+// A merkle proof is a data structure that proves a content is stored in the Merkle tree.
+message MerkleProof {
+  // The root of Merkle tree, it's a SHA256 hash.
+  bytes root = 1;
+  // the proof pairs from bottom up.
+  repeated ProofPair proof_pairs = 2;
+}
+
+// ProofPair defines 2 hash values in the same layer of Merkle tree, that jointly calculate the parent.
+// For example:
+// * (parent primary)
+// | \
+// *  * secondary
+// primary
+message ProofPair {
+  // primary is the content's ancestor node hash value.
+  bytes primary = 1;
+  // secondary is the helper of primary, in order to get the parent node's hash.
+  bytes secondary = 2;
+}
