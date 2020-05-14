@@ -2,20 +2,18 @@ package rbc
 
 import (
 	"context"
+	"github.com/gopricy/mao-bft/pb"
 	"google.golang.org/grpc"
 )
 
 type PrepareClientWrapper struct {
 }
 
-func (PrepareClientWrapper) SendPrepare(conn *grpc.ClientConn, merkleRoot string, merkleBranch []string, data []byte) error{
-	payload := &Payload{
-		MerkleRoot:           merkleRoot,
-		MerkleBranch:         merkleBranch,
-		Data:                 data,
+func (PrepareClientWrapper) SendPrepare(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error {
+	payload := &pb.Payload{
+		MerkleProof: merkleProof,
+		Data:        data,
 	}
-	_, err := NewPrepareClient(conn).Prepare(context.Background(), payload)
+	_, err := pb.NewPrepareClient(conn).Prepare(context.Background(), payload)
 	return err
 }
-
-

@@ -3,7 +3,7 @@ package maobft
 import (
 	"encoding"
 
-	pb "github.com/gopricy/mao-bft/rbc"
+	pb "github.com/gopricy/mao-bft/pb"
 	"google.golang.org/grpc"
 )
 
@@ -11,20 +11,20 @@ type Message interface {
 	encoding.BinaryMarshaler
 }
 
-type RBCNode interface {
+type Common interface {
 	Name() string
-	SendEcho(conn *grpc.ClientConn, merkleRoot string, merkleBranch []string, data []byte) error
-	SendReady(conn *grpc.ClientConn, merkleRoot string) error
+	SendEcho(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error
+	SendReady(conn *grpc.ClientConn, merkleRoot []byte) error
 	pb.ReadyServer
 	pb.EchoServer
 }
 
-type RBCServer interface {
-	SendPrepare(conn *grpc.ClientConn, merkleRoot string, merkleBranch []string, data []byte) error
-	RBCNode
+type Mao interface {
+	SendPrepare(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error
+	Common
 }
 
-type RBCClient interface {
+type MaoFollower interface {
 	pb.PrepareServer
-	RBCNode
+	Common
 }

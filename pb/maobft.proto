@@ -34,7 +34,7 @@ message PrepareResponse{}
 message EchoResponse{}
 
 message ReadyRequest{
-  string merkle_root = 1;
+  bytes merkle_root = 1;
 }
 
 message ReadyResponse{}

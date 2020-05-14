@@ -2,7 +2,7 @@ package maobft
 
 import (
 	"context"
-	pb "github.com/gopricy/mao-bft/rbc"
+	"github.com/gopricy/mao-bft/pb"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"net"
@@ -10,7 +10,7 @@ import (
 )
 
 type MockServer struct{
-	Server
+	Leader
 	savedPayload []*pb.Payload
 }
 
@@ -21,14 +21,14 @@ func (ms *MockServer) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoRespon
 }
 
 type MockClient struct{
-	Client
+	Follower
 }
 
 const address = "localhost:8000"
 
 func TestEcho(t *testing.T){
-	client := MockClient{NewClient("clientA")}
-	server := MockServer{NewServer("server"), []*pb.Payload{}}
+	client := MockClient{NewFollower("F")}
+	server := MockServer{NewLeader("L"), []*pb.Payload{}}
 	lis, err := net.Listen("tcp", address)
 	assert.Nil(t, err)
 	s := grpc.NewServer()
@@ -39,8 +39,8 @@ func TestEcho(t *testing.T){
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	assert.Nil(t, err)
 	defer conn.Close()
-	client.SendEcho(conn, "dummy_root", []string{"1", "2"}, []byte{'a', 'b', 'c'})
+	client.SendEcho(conn, &pb.MerkleProof{Root:[]byte{'1', '2'}}, []byte{'a', 'b', 'c'})
 	s.GracefulStop()
 	assert.Equal(t, 1, len(server.savedPayload))
-	assert.Equal(t, "dummy_root", server.savedPayload[0].MerkleRoot)
+	assert.Equal(t, 2, len(server.savedPayload[0].MerkleProof.Root))
 }
