@@ -2,6 +2,7 @@ package maobft
 
 import (
 	"context"
+
 	pb "github.com/gopricy/mao-bft/rbc"
 )
 
@@ -13,7 +14,7 @@ type Client struct {
 	pb.EchoClientWrapper
 }
 
-func NewClient(name string) Client{
+func NewClient(name string) Client {
 	return Client{name: name}
 }
 
@@ -34,12 +35,6 @@ func (s *Client) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	return &pb.ReadyResponse{}, nil
 }
 
-// Apply take the transaction into effect
-func (s *Client) Apply(msg Message) error{
-	//TODO: implement Apply
-	return nil
-}
-
-func (s *Client) Name() string{
+func (s *Client) Name() string {
 	return s.name
 }
