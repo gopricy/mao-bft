@@ -86,3 +86,8 @@ func buildTree(nodes []*Node) (Node, error) {
 func GetProof(tree *MerkleTree, content Content) (pb.MerkleProof, error) {
 	return pb.MerkleProof{}, nil
 }
+
+// VerifyProof verifies a MerkleProof, it takes in a data list, and verify all the way to the end.
+func VerifyProof(proof pb.MerkleProof, data []byte) (bool, error) {
+	return false, nil
+}
