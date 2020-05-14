@@ -5,3 +5,4 @@ go:
 
 scripts:
   - go test .
+  - go test github.com/gopricy/mao-bft/merkle

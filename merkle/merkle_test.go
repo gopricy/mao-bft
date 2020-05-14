@@ -13,20 +13,20 @@ type testContent struct {
 
 func (tc *testContent) CalcHash() ([]byte, error) {
 	hash := sha256.New()
-	if _, err := hash.Write(tc.x[:]); err != nil {
+	if _, err := hash.Write([]byte(tc.x)); err != nil {
 		return nil, errors.New("cannot create hash")
 	}
 	return hash.Sum(nil), nil
 }
 
 func (tc *testContent) Equals(content Content) (bool, error) {
-	return len(tc.x) == len(content.(testContent).x), nil
+	return len(tc.x) == len(content.(*testContent).x), nil
 }
 
 func TestBuildTree(t *testing.T) {
 	var contents []Content
-	contents = append(contents, testContent{x: [2]byte{1, 1}})
-	contents = append(contents, testContent{x: [2]byte{2, 2}})
+	contents = append(contents, &testContent{x: string([]byte{1, 1})})
+	contents = append(contents, &testContent{x: string([]byte{2, 2})})
 
 	tree := MerkleTree{}
 	tree.Init(contents)

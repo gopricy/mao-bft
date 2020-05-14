@@ -1,7 +1,7 @@
 # mao-bft
 mao-bft is an efficient byzantine fault tolerance protocol without leader reelection
 
-[![GoDoc](https://godoc.org/github.com/gopricy/mao-bft?status.svg)](https://godoc.org/github.com/gopricy/mao-bft)
+[![GoDoc](https://godoc.org/github.com/gopricy/mao-bft?status.svg)](https://pkg.go.dev/github.com/gopricy/mao-bft?tab=doc)
 [![Build Status](https://travis-ci.com/gopricy/mao-bft.svg?branch=master)](https://travis-ci.com/gopricy/mao-bft)
 
 ## Consensus layer
