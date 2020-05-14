@@ -1,6 +1,7 @@
+// protoc -I pb pb/maobft.proto --go_out=plugins=grpc:pb
 syntax = "proto3";
 
-package proto;
+package pb;
 
 // A merkle proof is a data structure that proves a content is stored in the Merkle tree.
 message MerkleProof {
@@ -22,3 +23,31 @@ message ProofPair {
   // secondary is the helper of primary, in order to get the parent node's hash.
   bytes secondary = 2;
 }
+
+message Payload{
+  MerkleProof merkle_proof = 1;
+  bytes data = 2;
+}
+
+message PrepareResponse{}
+
+message EchoResponse{}
+
+message ReadyRequest{
+  string merkle_root = 1;
+}
+
+message ReadyResponse{}
+
+service Prepare{
+  rpc Prepare(Payload) returns (PrepareResponse) {}
+}
+
+service Echo{
+  rpc Echo(Payload) returns (EchoResponse) {}
+}
+
+service Ready{
+  rpc Ready(ReadyRequest) returns (ReadyResponse) {}
+}
+
