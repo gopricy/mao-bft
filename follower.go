@@ -15,6 +15,7 @@ func NewFollower(name string) Follower {
 	return Follower{common: common{name: name}}
 }
 
+// Prepare serves Prepare messages sent from Leader
 func (s *Follower) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareResponse, error) {
 	//TODO: implement
 	return &pb.PrepareResponse{}, nil

@@ -9,6 +9,7 @@ import (
 type EchoClientWrapper struct {
 }
 
+// Send Echo when a Prepare message is received
 func (EchoClientWrapper) SendEcho(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error {
 	payload := &pb.Payload{
 		MerkleProof: merkleProof,

@@ -14,15 +14,17 @@ type common struct{
 	rbc.ReadyClientWrapper
 }
 
+// Echo serves echo messages from other nodes
 func (c *common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
 	return &pb.EchoResponse{}, nil
 }
 
+// Ready serves ready messages from other nodes
 func (c *common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResponse, error) {
 	return &pb.ReadyResponse{}, nil
 }
 
-// Name is the server name
+// Name is the node's name
 func (c *common) Name() string {
 	return c.name
 }

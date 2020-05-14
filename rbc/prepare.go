@@ -9,6 +9,7 @@ import (
 type PrepareClientWrapper struct {
 }
 
+// Leader sends Prepare messages to all Followers
 func (PrepareClientWrapper) SendPrepare(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error {
 	payload := &pb.Payload{
 		MerkleProof: merkleProof,
