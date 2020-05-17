@@ -1,10 +1,10 @@
 package merkle
 
 import (
-	_ "bytes"
 	sha256 "crypto/sha256"
+	"encoding/hex"
 	"errors"
-	_ "errors"
+
 	pb "github.com/gopricy/mao-bft/pb"
 )
 
@@ -14,14 +14,21 @@ type Content interface {
 	CalcHash() ([]byte, error)
 	// Equals compare with another another content.
 	Equals(content Content) (bool, error)
-	// DebugString output this content
-	DebugString() string
+	// String output this content
+	String() string
 }
 
 // MerkleTree contains pointer to contents that are stored in it, as well as the tree root.
 type MerkleTree struct {
 	Root   *Node
 	Leaves []*Node
+}
+
+type RootString string
+
+// MerkleRootToString converts a merkle root to string
+func MerkleRootToString(mr []byte) RootString{
+	return RootString(hex.EncodeToString(mr))
 }
 
 // Node represents the Node that are stored in Merkle tree. A node becomes a leaf when Value is not nil.
@@ -119,7 +126,7 @@ func GetProof(tree *MerkleTree, content Content) (pb.MerkleProof, error) {
 			return computeMerkleProofFromLeaf(leaf, tree.Root)
 		}
 	}
-	return pb.MerkleProof{}, errors.New("does not find the content in tree: " + content.DebugString())
+	return pb.MerkleProof{}, errors.New("does not find the content in tree: " + content.String())
 }
 
 func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) {

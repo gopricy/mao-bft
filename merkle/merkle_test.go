@@ -25,7 +25,7 @@ func (tc *testContent) Equals(content Content) (bool, error) {
 	return tc.x == content.(*testContent).x, nil
 }
 
-func (tc *testContent) DebugString() string {
+func (tc *testContent) String() string {
 	return tc.x
 }
 
@@ -52,7 +52,7 @@ func TestBuildTreeEvenNodes(t *testing.T) {
 	hashHexString := hex.EncodeToString(tree.Root.Hash)
 	assert.Equal(t, "e5a01fee14e0ed5c48714f22180f25ad8365b53f9779f79dc4a3d7e93963f94a", hashHexString)
 	assert.Equal(t, len(tree.Leaves), 2)
-	assert.Equal(t, (*tree.Leaves[0].Value).DebugString(), "a")
+	assert.Equal(t, (*tree.Leaves[0].Value).String(), "a")
 }
 
 func TestBuildTreeOddNodes(t *testing.T) {
