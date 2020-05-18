@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gopricy/mao-bft/pb"
+	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
 	"github.com/gopricy/mao-bft/rbc/leader"
 	"github.com/stretchr/testify/assert"
@@ -41,8 +42,8 @@ func (mf *MockFollower) Prepare(ctx context.Context, req *pb.Payload) (*pb.Prepa
 const port = 8000
 
 func TestEcho(t *testing.T){
-	client := MockLeader{leader.NewLeader("L")}
-	server := MockFollower{Follower: follower.NewFollower("F")}
+	client := MockLeader{leader.NewLeader("L", nil)}
+	server := MockFollower{Follower: follower.NewFollower("F", nil)}
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	assert.Nil(t, err)
 	s := grpc.NewServer()
@@ -52,16 +53,14 @@ func TestEcho(t *testing.T){
 	pb.RegisterPrepareServer(s, &server)
 	go s.Serve(lis)
 
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", port), grpc.WithInsecure(), grpc.WithBlock())
-	assert.Nil(t, err)
-	defer conn.Close()
+	peer := common.Peer{IP:"127.0.0.1", PORT: 8000}
 
-	err = client.SendPrepare(conn, &pb.MerkleProof{Root:[]byte("root")}, []byte("prepare"))
+	err = client.SendPrepare(peer, &pb.MerkleProof{Root:[]byte("root")}, []byte("prepare"))
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(server.savedPrepare))
 	assert.Equal(t, []byte("root"), server.savedPrepare[0].MerkleProof.Root)
 	assert.Equal(t, []byte("prepare"), server.savedPrepare[0].Data)
-	err = client.SendEcho(conn, &pb.MerkleProof{Root:[]byte("root")}, []byte("echo"))
+	err = client.SendEcho(peer, &pb.MerkleProof{Root:[]byte("root")}, []byte("echo"))
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(server.savedEcho))
 	assert.Equal(t, []byte("root"), server.savedEcho[0].MerkleProof.Root)

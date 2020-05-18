@@ -13,8 +13,8 @@ type Follower struct {
 	pb.UnimplementedPrepareServer
 }
 
-func NewFollower(name string) Follower {
-	return Follower{name: name, Common: common.Common{}}
+func NewFollower(name string, app common.Application) Follower {
+	return Follower{name: name, Common: common.Common{App: app}}
 }
 
 // Prepare serves Prepare messages sent from Leader

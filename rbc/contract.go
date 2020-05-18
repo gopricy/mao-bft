@@ -8,7 +8,6 @@ import (
 	pb "github.com/gopricy/mao-bft/pb"
 )
 
-
 type Common interface {
 	Name() string
 	SendEcho(common.Peer, *pb.MerkleProof, []byte) error

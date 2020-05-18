@@ -7,7 +7,7 @@ import (
 
 type ReadyClientWrapper struct{}
 
-// Send Ready upon receiving N-f distinct Echos and successfully validated
+// Send Ready upon receiving N-f distinct Echos and successfully validated or f+1 READY
 func (ReadyClientWrapper) SendReady(peer Peer, merkleRoot []byte) error {
 	request := &pb.ReadyRequest{MerkleRoot: merkleRoot}
 	conn, err := createConnection(peer.IP, peer.PORT)

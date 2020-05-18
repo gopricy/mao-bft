@@ -10,8 +10,8 @@ type Leader struct {
 	common.PrepareClientWrapper
 }
 
-func NewLeader(name string) Leader {
-	return Leader{name: name, Common: common.Common{}}
+func NewLeader(name string, app common.Application) Leader {
+	return Leader{name: name, Common: common.Common{App: app}}
 }
 
 func (l *Leader) Name() string{

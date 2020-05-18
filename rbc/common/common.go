@@ -9,45 +9,29 @@ import (
 	"sync"
 )
 
-type EchoReceived struct{
+type Application interface{
+	Apply([]byte) error
+}
+
+type Received struct{
 	// TODO: improve the efficiency with better locking
-	echos map[merkle.RootString]map[string]*pb.Payload
+	rec map[merkle.RootString]map[string]interface{}
 	mu sync.Mutex
 }
 
-func (er *EchoReceived) Add(ip string, pl *pb.Payload) (int, error){
+func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error){
 	er.mu.Lock()
 	defer er.mu.Unlock()
-	root := merkle.MerkleRootToString(pl.MerkleProof.Root)
-	if _, ok := er.echos[root]; !ok{
+	root := merkle.MerkleRootToString(merkleRoot)
+	if _, ok := er.rec[root]; !ok{
 		// if this message hasn't been seen
-		er.echos[root] = make(map[string]*pb.Payload)
+		er.rec[root] = make(map[string]interface{})
 	}
-	if _, ok := er.echos[root][ip]; ok{
-		return len(er.echos[root]), errors.New("Duplicate ECHO from same IP carrying same message")
+	if _, ok := er.rec[root][ip]; ok{
+		return len(er.rec[root]), errors.New("Duplicate ECHO from same IP carrying same message")
 	}
-	er.echos[root][ip] = pl
-	return len(er.echos[root]), nil
-}
-
-type ReadyReceived struct{
-	readies map[merkle.RootString]map[string]struct{}
-	mu sync.Mutex
-}
-
-func (rr *ReadyReceived) Add(ip string, pl *pb.ReadyRequest) (int, error){
-	rr.mu.Lock()
-	defer rr.mu.Unlock()
-	root := merkle.MerkleRootToString(pl.MerkleRoot)
-	if _, ok := rr.readies[root]; !ok{
-		// if this message hasn't been seen
-		rr.readies[root] = make(map[string]struct{})
-	}
-	if _, ok := rr.readies[root][ip]; ok{
-		return len(rr.readies[root]), errors.New("Duplicate ECHO from same IP carrying same message")
-	}
-	rr.readies[root][ip] = struct{}{}
-	return len(rr.readies[root]), nil
+	er.rec[root][ip] = rec
+	return len(er.rec[root]), nil
 }
 
 // TODO: PERFORMANCE we probably want to keep the sessions with each peer
@@ -66,10 +50,12 @@ type Common struct {
 	KnownPeers []Peer
 	ByzantineLimit int
 
-	EchosReceived EchoReceived
-	ReadiesReceived ReadyReceived
+	EchosReceived Received
+	ReadiesReceived Received
 
 	ReadiesSent sync.Map
+
+	App Application
 }
 
 func (c *Common) readyIsSent(merkleroot []byte) bool{
@@ -90,7 +76,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	if !ok {
 		return nil, errors.New("Can't get PeerInfo")
 	}
-	e, err := c.EchosReceived.Add(p.Addr.String(), req)
+	e, err := c.EchosReceived.Add(p.Addr.String(), req.MerkleProof.Root, req)
 	if err != nil{
 		return nil, err
 	}
@@ -104,7 +90,17 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 					return nil, err
 				}
 			}
-
+		}
+	}
+	rootString := merkle.MerkleRootToString(req.MerkleProof.Root)
+	// 2f + 1 Ready and N - 2f Echo, decode and apply
+	if e == len(c.KnownPeers) - 2 * c.ByzantineLimit{
+		if len(c.ReadiesReceived.rec[rootString]) >= 2 * c.ByzantineLimit + 1{
+			//decode: need merkle support
+			//apply real decoded bytes
+			if err := c.App.Apply([]byte{}); err != nil{
+				return nil, err
+			}
 		}
 	}
 
@@ -119,7 +115,7 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	}
 
 	// TODO: after getting f+1 READY: Send Ready if not Sent
-	r, err := c.ReadiesReceived.Add(p.Addr.String(), req)
+	r, err := c.ReadiesReceived.Add(p.Addr.String(), req.MerkleRoot, struct{}{})
 	if err != nil{
 		return nil, err
 	}
@@ -134,6 +130,18 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			}
 		}
 	}
+
+	merkleRoot := merkle.MerkleRootToString(req.MerkleRoot)
+	if r == 2 * c.ByzantineLimit + 1{
+		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.KnownPeers) - 2 * c.ByzantineLimit{
+			//decode: need merkle support
+			//apply real decoded bytes
+			if err := c.App.Apply([]byte{}); err != nil{
+				return nil, err
+			}
+		}
+	}
+
 	return &pb.ReadyResponse{}, nil
 }
 
