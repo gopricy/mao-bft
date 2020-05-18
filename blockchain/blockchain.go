@@ -17,7 +17,7 @@ type StagedBlock struct {
 // Insert to list in sorted order.
 func OrderedInsertToList(head StagedBlock, Block pb.Block) bool {
 	cur := &head
-	for cur.Next != nil && cur.Next.Value.SeqNumber < head.Value.SeqNumber {
+	for cur.Next != nil && cur.Next.Value.Content.SeqNumber < head.Value.Content.SeqNumber {
 		cur = cur.Next
 	}
 	// Insert after cur node.
@@ -41,8 +41,13 @@ type Blockchain struct {
 }
 
 func (bc *Blockchain) Init() {
-	// Add a sentinel node.
+	// Add a sentinel node for both staged and blockchain.
+	bc.Chain = append(bc.Chain, &pb.Block{})
 	bc.Staged = StagedBlock{}
+}
+
+func (bc *Blockchain) GetLastBlock() *pb.Block {
+	return bc.Chain[len(bc.Chain) - 1]
 }
 
 // Add to staged area in sorted order.
@@ -53,8 +58,8 @@ func (bc *Blockchain) addToStagedArea(Block pb.Block) bool {
 // ValidateBlock validates that a block's cur_hash matches the actual hash.
 func ValidateBlock(Block pb.Block) bool {
 	h := sha256.New()
-	byteBlock, _ := proto.Marshal(&Block)
-	if _, err := h.Write(byteBlock); err != nil {
+	byteContent, _ := proto.Marshal(Block.Content)
+	if _, err := h.Write(byteContent); err != nil {
 		return false
 	}
 	return mao_utils.IsSameBytes(h.Sum(nil), Block.CurHash)
@@ -70,8 +75,10 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, err
 	// 1. Add the block to staged area in order.
 	bc.addToStagedArea(Block)
 	// 2. try commit to chain if it matches the last block.
-	// 3. If commit successfully, try to commit more in staging area, then:
-	// 3.1 Remove successfully committed blocks from staging area.
-	// 3.2 Remove successfully staged blocks that are conflicting with chain.
+	if mao_utils.IsSameBytes(Block.Content.PrevHash, bc.GetLastBlock().CurHash) {
+		// 3. If commit successfully, try to commit more in staging area, then:
+		// 3.1 Remove successfully committed blocks from staging area.
+		// 3.2 Remove successfully staged blocks that are conflicting with chain.
+	}
 	return nil, nil, nil
 }

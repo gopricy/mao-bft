@@ -30,14 +30,19 @@ message Payload{
 }
 
 message Block {
+  // The content of this block, which hashes to cur_hash.
+  BlockContent content = 1;
+  // Hash of this block.
+  bytes cur_hash = 2;
+}
+
+message BlockContent {
   // This defines the transactions that is contained in this block.
   repeated Transaction txs = 1;
   // Hash of previous block, nil if block is head.
   bytes prev_hash = 2;
-  // Hash of this block.
-  bytes cur_hash = 3;
   // Location of this block on blockchain.
-  int32 seq_number = 4;
+  int32 seq_number = 3;
 }
 
 message SimpleKeyValueStoreMessage {
