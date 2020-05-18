@@ -4,8 +4,8 @@ import (
 	sha256 "crypto/sha256"
 	"encoding/hex"
 	"errors"
-
 	pb "github.com/gopricy/mao-bft/pb"
+	mao_utils "github.com/gopricy/mao-bft/utils"
 )
 
 // Content defines the object that will get stored in Merkle tree.
@@ -40,24 +40,12 @@ type Node struct {
 	Value  *Content
 }
 
-func isSameBytes(left []byte, right []byte) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i, val := range left {
-		if right[i] != val {
-			return false
-		}
-	}
-	return true
-}
-
 func getNodeSibling(node *Node) (*Node, error) {
 	if node.Parent == nil {
 		return nil, errors.New("parent doesn't have sibling")
 	}
 	parent := node.Parent
-	if isSameBytes(parent.Left.Hash, node.Hash) {
+	if mao_utils.IsSameBytes(parent.Left.Hash, node.Hash) {
 		return parent.Right, nil
 	}
 	return parent.Right, nil
@@ -148,7 +136,7 @@ func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) 
 		curNode = curNode.Parent
 	}
 	// validate that now curNode should be root
-	if !isSameBytes(curNode.Hash, root.Hash) {
+	if !mao_utils.IsSameBytes(curNode.Hash, root.Hash) {
 		return pb.MerkleProof{}, errors.New("early abort before reaching parent, curNode hash is: " + string(curNode.Hash))
 	}
 	return proof, nil
@@ -160,7 +148,7 @@ func verifyHashToParent(left []byte, right []byte, parent []byte) bool {
 	if _, err := hash.Write(append(left, right...)); err != nil {
 		return false
 	}
-	return isSameBytes(hash.Sum(nil), parent)
+	return mao_utils.IsSameBytes(hash.Sum(nil), parent)
 }
 
 // VerifyProof verifies a MerkleProof, it takes in a data list, and verify all the way to the end.
@@ -168,7 +156,7 @@ func VerifyProof(proof pb.MerkleProof, content Content) bool {
 	// If proof just contain root, it should be a single node tree.
 	if proof.ProofPairs == nil {
 		contentHash, err := content.CalcHash()
-		return err == nil && isSameBytes(contentHash, proof.Root)
+		return err == nil && mao_utils.IsSameBytes(contentHash, proof.Root)
 	}
 
 	// Verify all the way to root hash.
@@ -187,7 +175,7 @@ func VerifyProof(proof pb.MerkleProof, content Content) bool {
 
 	// Verify content hashes to first primary.
 	contentHash, err := content.CalcHash()
-	if err != nil || !isSameBytes(contentHash, proof.ProofPairs[0].Primary) {
+	if err != nil || !mao_utils.IsSameBytes(contentHash, proof.ProofPairs[0].Primary) {
 		return false
 	}
 	return true
