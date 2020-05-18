@@ -29,6 +29,33 @@ message Payload{
   bytes data = 2;
 }
 
+message Block {
+  // This defines the transactions that is contained in this block.
+  repeated Transaction txs = 1;
+  // Hash of previous block, nil if block is head.
+  bytes prev_hash = 2;
+  // Hash of this block.
+  bytes cur_hash = 3;
+  // Location of this block on blockchain.
+  int32 seq_number = 4;
+}
+
+message SimpleKeyValueStoreMessage {
+  // the key that we're changing value.
+  string key = 1;
+  // the value we assign to this key.
+  string value = 2;
+}
+
+message Transaction {
+  oneof message {
+    // This message is used to implement simple key value store.
+    SimpleKeyValueStoreMessage kv_pair = 1;
+  }
+}
+
+
+
 message PrepareResponse{}
 
 message EchoResponse{}
