@@ -3,14 +3,17 @@ package common
 import (
 	"context"
 	"github.com/gopricy/mao-bft/pb"
-	"google.golang.org/grpc"
 )
 
 type ReadyClientWrapper struct{}
 
 // Send Ready upon receiving N-f distinct Echos and successfully validated
-func (ReadyClientWrapper) SendReady(conn *grpc.ClientConn, merkleRoot []byte) error {
+func (ReadyClientWrapper) SendReady(peer Peer, merkleRoot []byte) error {
 	request := &pb.ReadyRequest{MerkleRoot: merkleRoot}
-	_, err := pb.NewReadyClient(conn).Ready(context.Background(), request)
+	conn, err := createConnection(peer.IP, peer.PORT)
+	if err != nil{
+		return err
+	}
+	_, err = pb.NewReadyClient(conn).Ready(context.Background(), request)
 	return err
 }

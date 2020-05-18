@@ -6,14 +6,13 @@ import (
 	"github.com/gopricy/mao-bft/rbc/leader"
 
 	pb "github.com/gopricy/mao-bft/pb"
-	"google.golang.org/grpc"
 )
 
 
 type Common interface {
 	Name() string
-	SendEcho(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error
-	SendReady(conn *grpc.ClientConn, merkleRoot []byte) error
+	SendEcho(common.Peer, *pb.MerkleProof, []byte) error
+	SendReady(common.Peer, []byte) error
 	pb.ReadyServer
 	pb.EchoServer
 }
@@ -21,7 +20,7 @@ type Common interface {
 var _ Common = &common.Common{}
 
 type Mao interface {
-	SendPrepare(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error
+	SendPrepare(common.Peer, *pb.MerkleProof, []byte) error
 	Common
 }
 

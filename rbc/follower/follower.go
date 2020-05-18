@@ -19,7 +19,11 @@ func NewFollower(name string) Follower {
 
 // Prepare serves Prepare messages sent from Leader
 func (f *Follower) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareResponse, error) {
-	//TODO: implement
+	for _, p := range f.KnownPeers{
+		if err := f.SendEcho(p, req.MerkleProof, req.Data); err != nil{
+			return nil, err
+		}
+	}
 	return &pb.PrepareResponse{}, nil
 }
 
