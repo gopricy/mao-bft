@@ -50,4 +50,3 @@ service Echo{
 service Ready{
   rpc Ready(ReadyRequest) returns (ReadyResponse) {}
 }
-

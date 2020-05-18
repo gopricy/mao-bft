@@ -4,5 +4,5 @@ go:
   - 1.13.x
 
 scripts:
-  - go test .
+  - go test github.com/gopricy/mao-bft/rbc
   - go test github.com/gopricy/mao-bft/merkle

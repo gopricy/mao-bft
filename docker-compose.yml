@@ -1,0 +1,10 @@
+version: '3'
+services:
+  follower:
+    build: ./rbc/follower
+    ports:
+      - "8000-8100:8000"
+    environment:
+      RBC_PORT: 8000
+  leader:
+    build: ./rbc/leader

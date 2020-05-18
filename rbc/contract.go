@@ -1,15 +1,14 @@
-package maobft
+package rbc
 
 import (
-	"encoding"
+	"github.com/gopricy/mao-bft/rbc/common"
+	"github.com/gopricy/mao-bft/rbc/follower"
+	"github.com/gopricy/mao-bft/rbc/leader"
 
 	pb "github.com/gopricy/mao-bft/pb"
 	"google.golang.org/grpc"
 )
 
-type Message interface {
-	encoding.BinaryMarshaler
-}
 
 type Common interface {
 	Name() string
@@ -19,12 +18,18 @@ type Common interface {
 	pb.EchoServer
 }
 
+var _ Common = &common.Common{}
+
 type Mao interface {
 	SendPrepare(conn *grpc.ClientConn, merkleProof *pb.MerkleProof, data []byte) error
 	Common
 }
 
+var _ Mao = &leader.Leader{}
+
 type MaoFollower interface {
 	pb.PrepareServer
 	Common
 }
+
+var _MaoFollower = &follower.Follower{}
