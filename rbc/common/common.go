@@ -10,7 +10,7 @@ import (
 )
 
 type Application interface{
-	Apply([]byte) error
+	RBCReceive([]byte) error
 }
 
 type Received struct{

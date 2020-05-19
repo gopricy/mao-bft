@@ -4,6 +4,8 @@ import (
 	sha256 "crypto/sha256"
 	"errors"
 	"github.com/gopricy/mao-bft/pb"
+	"github.com/gopricy/mao-bft/rbc/follower"
+	"github.com/gopricy/mao-bft/rbc/leader"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"google.golang.org/protobuf/proto"
 )
@@ -48,6 +50,38 @@ type Blockchain struct {
 	Chain []*pb.Block
 	// This list stores sorted blocks that are not committed. All blocks are sorted by sequence number.
 	Staged StagedBlock
+}
+
+func (b *Blockchain) RBCReceive([]byte) error{
+	return nil
+}
+
+type BlockchainFollower struct {
+	Blockchain
+	follower.Follower
+}
+
+func NewBlockchainFollower(name string) BlockchainFollower{
+	res := BlockchainFollower{}
+	res.Follower = follower.NewFollower(name, &res)
+	return res
+}
+
+type BlockchainLeader struct{
+	Blockchain
+	leader.Leader
+}
+
+// Client will call this
+func (bl *BlockchainLeader) Send(p *pb.Block) error{
+	b, _ := proto.Marshal(p)
+	return bl.RBCSend(b)
+}
+
+func NewBlockchainLeader(name string) BlockchainLeader{
+	res := BlockchainLeader{}
+	res.Leader = leader.NewLeader(name, &res)
+	return res
 }
 
 func (bc *Blockchain) Init() {
