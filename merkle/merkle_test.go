@@ -126,3 +126,57 @@ func TestVerifyProofSingleNode(t *testing.T) {
 	// Test negative.
 	assert.Equal(t, false, VerifyProof(merkleProof, &testContent{x: "b"}))
 }
+
+func TestGetLeafIndex(t *testing.T) {
+	var contents []Content
+	contents = append(
+		contents,
+		&testContent{x: "a"}, &testContent{x: "b"}, &testContent{x: "c"})
+	tree := MerkleTree{}
+	tree.Init(contents)
+	// Test 'a'
+	aProof, _ := GetProof(&tree, &testContent{x: "a"})
+	assert.Equal(t, GetLeafIndex(aProof), 0)
+	// Test 'b'
+	bProof, _ := GetProof(&tree, &testContent{x: "b"})
+	assert.Equal(t, GetLeafIndex(bProof), 1)
+	// Test 'c'
+	cProof, _ := GetProof(&tree, &testContent{x: "c"})
+	assert.Equal(t, GetLeafIndex(cProof), 2)
+}
+
+func TestGetLeafIndex5NodeTree(t *testing.T) {
+	var contents []Content
+	contents = append(
+		contents,
+		&testContent{x: "a"}, &testContent{x: "b"}, &testContent{x: "c"}, &testContent{x: "d"}, &testContent{x: "e"})
+	tree := MerkleTree{}
+	tree.Init(contents)
+	// Test 'a'
+	aProof, _ := GetProof(&tree, &testContent{x: "a"})
+	assert.Equal(t, GetLeafIndex(aProof), 0)
+	// Test 'b'
+	bProof, _ := GetProof(&tree, &testContent{x: "b"})
+	assert.Equal(t, GetLeafIndex(bProof), 1)
+	// Test 'c'
+	cProof, _ := GetProof(&tree, &testContent{x: "c"})
+	assert.Equal(t, GetLeafIndex(cProof), 2)
+	// Test 'd'
+	dProof, _ := GetProof(&tree, &testContent{x: "d"})
+	assert.Equal(t, GetLeafIndex(dProof), 3)
+	// Test 'e'
+	eProof, _ := GetProof(&tree, &testContent{x: "e"})
+	assert.Equal(t, GetLeafIndex(eProof), 4)
+}
+
+func TestGetLeafIndexSingleNode(t *testing.T) {
+	var contents []Content
+	contents = append(
+		contents,
+		&testContent{x: "a"})
+	tree := MerkleTree{}
+	tree.Init(contents)
+	// Test 'a'
+	aProof, _ := GetProof(&tree, &testContent{x: "a"})
+	assert.Equal(t, GetLeafIndex(aProof), 0)
+}

@@ -40,15 +40,15 @@ type Node struct {
 	Value  *Content
 }
 
-func getNodeSibling(node *Node) (*Node, error) {
+func getNodeSibling(node *Node) (*Node, bool, error) {
 	if node.Parent == nil {
-		return nil, errors.New("parent doesn't have sibling")
+		return nil, true, errors.New("parent doesn't have sibling")
 	}
 	parent := node.Parent
 	if mao_utils.IsSameBytes(parent.Left.Hash, node.Hash) {
-		return parent.Right, nil
+		return parent.Right, false, nil
 	}
-	return parent.Right, nil
+	return parent.Left, true, nil
 }
 
 // Init inits a Merkle tree from contents, it takes in a list of Content, and init the entire tree.
@@ -124,7 +124,7 @@ func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) 
 	proof := pb.MerkleProof{Root: root.Hash}
 	curNode := node
 	for curNode.Parent != nil {
-		sibling, err := getNodeSibling(curNode)
+		sibling, isRightChild ,err := getNodeSibling(curNode)
 		if err != nil {
 			return pb.MerkleProof{}, err
 		}
@@ -132,6 +132,7 @@ func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) 
 		proof.ProofPairs = append(proof.ProofPairs, &pb.ProofPair{
 			Primary:   curNode.Hash,
 			Secondary: sibling.Hash,
+			IsRightChild: isRightChild,
 		})
 		curNode = curNode.Parent
 	}
@@ -179,4 +180,25 @@ func VerifyProof(proof pb.MerkleProof, content Content) bool {
 		return false
 	}
 	return true
+}
+
+// GetLeafIndex returns the index according to the leaf location in all leaves. For example, consider tree:
+// root
+// | \
+// A  B
+// GetLeafIndex(B) -> 1
+func GetLeafIndex(proof pb.MerkleProof) int {
+	if proof.ProofPairs == nil {
+		return 0
+	}
+	index := 0
+	for i, proofPair := range proof.ProofPairs {
+		offset := 1 << i
+		mask := 1
+		if !proofPair.IsRightChild {
+			mask = 0
+		}
+		index += mask * offset
+	}
+	return index
 }
