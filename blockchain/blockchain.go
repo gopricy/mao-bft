@@ -1,9 +1,9 @@
 package blockchain
 
 import (
+	sha256 "crypto/sha256"
 	"errors"
 	"github.com/gopricy/mao-bft/pb"
-	sha256 "crypto/sha256"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"google.golang.org/protobuf/proto"
 )
@@ -12,6 +12,16 @@ type StagedBlock struct {
 	Prev *StagedBlock
 	Next *StagedBlock
 	Value *pb.Block
+}
+
+// RemoveStagedBlock removes a staged block from blockchain. Return next block.
+func RemoveStagedBlock(Block *StagedBlock) *StagedBlock {
+	nextBlock := Block.Next
+	if Block.Next != nil {
+		Block.Next.Prev = Block.Prev
+	}
+	Block.Prev.Next = Block.Next
+	return nextBlock
 }
 
 // Insert to list in sorted order.
@@ -76,9 +86,13 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, err
 	bc.addToStagedArea(Block)
 	// 2. try commit to chain if it matches the last block.
 	if mao_utils.IsSameBytes(Block.Content.PrevHash, bc.GetLastBlock().CurHash) {
-		// 3. If commit successfully, try to commit more in staging area, then:
-		// 3.1 Remove successfully committed blocks from staging area.
-		// 3.2 Remove successfully staged blocks that are conflicting with chain.
+		// Scan staging area and 1. Remove all invalid. 2. commit all can be connected.
+		cur := bc.Staged
+		for cur.Next != nil {
+			// if cur.Value.Content.SeqNumber < len(bc.Chain) - 1 {
+			// 	RemoveStagedBlock
+			// }
+		}
 	}
 	return nil, nil, nil
 }

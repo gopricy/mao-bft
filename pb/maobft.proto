@@ -22,6 +22,8 @@ message ProofPair {
   bytes primary = 1;
   // secondary is the helper of primary, in order to get the parent node's hash.
   bytes secondary = 2;
+  // is primary the right child of parent.
+  bool isRightChild = 3;
 }
 
 message Payload{
