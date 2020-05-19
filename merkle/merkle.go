@@ -103,30 +103,32 @@ func buildTree(nodes []*Node) (Node, error) {
 	return buildTree(parents)
 }
 
+// What if two shards have the same content?
+// We probably don't need Equal method in Content, instead we can compare two Content directly(Golang will compare if they are exact same object the pointer)
 // GetProof returns a MerkleProof for given object. If the supplied object doesn't exist in the tree, return error.
-func GetProof(tree *MerkleTree, content Content) (pb.MerkleProof, error) {
+func GetProof(tree *MerkleTree, content Content) (*pb.MerkleProof, error) {
 	for _, leaf := range tree.Leaves {
 		if leaf.Value == nil {
-			return pb.MerkleProof{}, errors.New("Leaf node cannot contain empty value, node hash: " + string(leaf.Hash))
+			return &pb.MerkleProof{}, errors.New("Leaf node cannot contain empty value, node hash: " + string(leaf.Hash))
 		}
 		// Found same content, construct and return the merkle proof.
 		if isEqual, _ := content.Equals(*leaf.Value); isEqual == true {
 			return computeMerkleProofFromLeaf(leaf, tree.Root)
 		}
 	}
-	return pb.MerkleProof{}, errors.New("does not find the content in tree: " + content.String())
+	return &pb.MerkleProof{}, errors.New("does not find the content in tree: " + content.String())
 }
 
-func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) {
+func computeMerkleProofFromLeaf(node *Node, root *Node) (*pb.MerkleProof, error) {
 	if root.Parent != nil {
-		return pb.MerkleProof{}, errors.New("root is invalid, it contains parent")
+		return nil, errors.New("root is invalid, it contains parent")
 	}
 	proof := pb.MerkleProof{Root: root.Hash}
 	curNode := node
 	for curNode.Parent != nil {
 		sibling, isRightChild ,err := getNodeSibling(curNode)
 		if err != nil {
-			return pb.MerkleProof{}, err
+			return nil, err
 		}
 		// Add proof pair into ProofPairs, in a bottom up way.
 		proof.ProofPairs = append(proof.ProofPairs, &pb.ProofPair{
@@ -138,9 +140,9 @@ func computeMerkleProofFromLeaf(node *Node, root *Node) (pb.MerkleProof, error) 
 	}
 	// validate that now curNode should be root
 	if !mao_utils.IsSameBytes(curNode.Hash, root.Hash) {
-		return pb.MerkleProof{}, errors.New("early abort before reaching parent, curNode hash is: " + string(curNode.Hash))
+		return nil, errors.New("early abort before reaching parent, curNode hash is: " + string(curNode.Hash))
 	}
-	return proof, nil
+	return &proof, nil
 }
 
 // verifyHashToParent verifies that hash(left + right) == parent.
@@ -153,7 +155,7 @@ func verifyHashToParent(left []byte, right []byte, parent []byte) bool {
 }
 
 // VerifyProof verifies a MerkleProof, it takes in a data list, and verify all the way to the end.
-func VerifyProof(proof pb.MerkleProof, content Content) bool {
+func VerifyProof(proof *pb.MerkleProof, content Content) bool {
 	// If proof just contain root, it should be a single node tree.
 	if proof.ProofPairs == nil {
 		contentHash, err := content.CalcHash()
@@ -187,7 +189,7 @@ func VerifyProof(proof pb.MerkleProof, content Content) bool {
 // | \
 // A  B
 // GetLeafIndex(B) -> 1
-func GetLeafIndex(proof pb.MerkleProof) int {
+func GetLeafIndex(proof *pb.MerkleProof) int {
 	if proof.ProofPairs == nil {
 		return 0
 	}

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"github.com/gopricy/mao-bft/erasure"
 	"github.com/gopricy/mao-bft/merkle"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/pkg/errors"
@@ -10,7 +11,7 @@ import (
 )
 
 type Application interface{
-	Apply([]byte) error
+	RBCReceive([]byte) error
 }
 
 type Received struct{
@@ -34,6 +35,11 @@ func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, err
 	return len(er.rec[root]), nil
 }
 
+type RBCSetting struct{
+	AllPeers []Peer
+	ByzantineLimit int
+}
+
 // TODO: PERFORMANCE we probably want to keep the sessions with each peer
 type Peer struct{
 	IP string
@@ -47,15 +53,22 @@ type Common struct {
 	EchoClientWrapper
 	ReadyClientWrapper
 
-	KnownPeers []Peer
-	ByzantineLimit int
+	RBCSetting
 
-	EchosReceived Received
+	EchosReceived   Received
 	ReadiesReceived Received
 
 	ReadiesSent sync.Map
 
 	App Application
+}
+
+func (c *Common) reconstructData(root merkle.RootString) ([]byte, error){
+	payloads := []*pb.Payload{}
+	for _, m := range c.EchosReceived.rec[root]{
+		payloads = append(payloads, m.(*pb.Payload))
+	}
+	return erasure.Reconstruct(payloads, c.ByzantineLimit, len(c.AllPeers))
 }
 
 func (c *Common) readyIsSent(merkleroot []byte) bool{
@@ -68,7 +81,8 @@ func (c *Common) readyIsSent(merkleroot []byte) bool{
 
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
-	if !merkle.VerifyProof(*req.MerkleProof, merkle.BytesContent(req.Data)){
+	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(req.Data))
+	if !valid{
 		return nil, merkle.InvalidProof{}
 	}
 	// Echo calls
@@ -80,11 +94,11 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	if err != nil{
 		return nil, err
 	}
-	if e == len(c.KnownPeers) - c.ByzantineLimit{
+	if e == len(c.RBCSetting.AllPeers) - c.ByzantineLimit{
 		// TODO: interpolate {s'j} from any N-2f leaves received
 		// TODO: recompute Merkle root h' and if h'!=h then abort
 		if !c.readyIsSent(req.MerkleProof.Root){
-			for _, p := range c.KnownPeers{
+			for _, p := range c.RBCSetting.AllPeers{
 				err = c.SendReady(p, req.MerkleProof.Root)
 				if err != nil{
 					return nil, err
@@ -94,16 +108,17 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	}
 	rootString := merkle.MerkleRootToString(req.MerkleProof.Root)
 	// 2f + 1 Ready and N - 2f Echo, decode and apply
-	if e == len(c.KnownPeers) - 2 * c.ByzantineLimit{
+	if e == len(c.RBCSetting.AllPeers) - 2 * c.ByzantineLimit{
 		if len(c.ReadiesReceived.rec[rootString]) >= 2 * c.ByzantineLimit + 1{
-			//decode: need merkle support
-			//apply real decoded bytes
-			if err := c.App.Apply([]byte{}); err != nil{
+			data, err := c.reconstructData(rootString)
+			if err != nil{
+				return nil, err
+			}
+			if err := c.App.RBCReceive(data); err != nil{
 				return nil, err
 			}
 		}
 	}
-
 	return &pb.EchoResponse{}, nil
 }
 
@@ -122,7 +137,7 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 
 	if r == c.ByzantineLimit + 1{
 		if !c.readyIsSent(req.MerkleRoot){
-			for _, p := range c.KnownPeers{
+			for _, p := range c.RBCSetting.AllPeers{
 				// TODO: PERFORMANCE probably need an unblocking call for performance
 				if err = c.SendReady(p, req.MerkleRoot); err != nil{
 					return nil, err
@@ -133,10 +148,12 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 
 	merkleRoot := merkle.MerkleRootToString(req.MerkleRoot)
 	if r == 2 * c.ByzantineLimit + 1{
-		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.KnownPeers) - 2 * c.ByzantineLimit{
-			//decode: need merkle support
-			//apply real decoded bytes
-			if err := c.App.Apply([]byte{}); err != nil{
+		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.RBCSetting.AllPeers) - 2 * c.ByzantineLimit{
+			data, err := c.reconstructData(merkleRoot)
+			if err != nil{
+				return nil, err
+			}
+			if err := c.App.RBCReceive(data); err != nil{
 				return nil, err
 			}
 		}

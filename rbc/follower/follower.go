@@ -13,13 +13,13 @@ type Follower struct {
 	pb.UnimplementedPrepareServer
 }
 
-func NewFollower(name string, app common.Application) Follower {
+func NewFollower(name string, app common.Application, ) Follower {
 	return Follower{name: name, Common: common.Common{App: app}}
 }
 
 // Prepare serves Prepare messages sent from Leader
 func (f *Follower) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareResponse, error) {
-	for _, p := range f.KnownPeers{
+	for _, p := range f.AllPeers{
 		if err := f.SendEcho(p, req.MerkleProof, req.Data); err != nil{
 			return nil, err
 		}

@@ -21,6 +21,7 @@ var _ Common = &common.Common{}
 type Mao interface {
 	SendPrepare(common.Peer, *pb.MerkleProof, []byte) error
 	Common
+	RBCSend([]byte) error
 }
 
 var _ Mao = &leader.Leader{}
