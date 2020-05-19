@@ -14,20 +14,20 @@ type StagedBlock struct {
 	Value *pb.Block
 }
 
-// RemoveStagedBlock removes a staged block from blockchain. Return next block.
+// RemoveStagedBlock removes a staged block from blockchain. Return prev block.
 func RemoveStagedBlock(Block *StagedBlock) *StagedBlock {
-	nextBlock := Block.Next
+	prevBlock := Block.Prev
 	if Block.Next != nil {
 		Block.Next.Prev = Block.Prev
 	}
 	Block.Prev.Next = Block.Next
-	return nextBlock
+	return prevBlock
 }
 
 // Insert to list in sorted order.
-func OrderedInsertToList(head StagedBlock, Block pb.Block) bool {
-	cur := &head
-	for cur.Next != nil && cur.Next.Value.Content.SeqNumber < head.Value.Content.SeqNumber {
+func OrderedInsertToList(head *StagedBlock, Block pb.Block) bool {
+	cur := head
+	for cur.Next != nil && cur.Next.Value.Content.SeqNumber < Block.Content.SeqNumber {
 		cur = cur.Next
 	}
 	// Insert after cur node.
@@ -36,11 +36,32 @@ func OrderedInsertToList(head StagedBlock, Block pb.Block) bool {
 		Next: cur.Next,
 		Value: &Block,
 	}
-	cur.Next = &newBlock
 	if cur.Next != nil {
 		cur.Next.Prev = &newBlock
 	}
+	cur.Next = &newBlock
 	return true
+}
+
+func GetStagedAreaSize(head StagedBlock) int {
+	cur := head.Next
+	count := 0
+	for cur != nil {
+		count += 1
+		cur = cur.Next
+	}
+	return count
+}
+
+func GetLastBlockInStagedArea(head StagedBlock) (StagedBlock, error) {
+	if head.Next == nil {
+		return StagedBlock{}, errors.New("Not staged block in staged area.")
+	}
+	cur := head.Next
+	for cur.Next != nil {
+		cur = cur.Next
+	}
+	return *cur, nil
 }
 
 type Blockchain struct {
@@ -60,9 +81,13 @@ func (bc *Blockchain) GetLastBlock() *pb.Block {
 	return bc.Chain[len(bc.Chain) - 1]
 }
 
+func (bc *Blockchain) GetLastIndex() int {
+	return len(bc.Chain) - 1
+}
+
 // Add to staged area in sorted order.
 func (bc *Blockchain) addToStagedArea(Block pb.Block) bool {
-	return OrderedInsertToList(bc.Staged, Block)
+	return OrderedInsertToList(&bc.Staged, Block)
 }
 
 // ValidateBlock validates that a block's cur_hash matches the actual hash.
@@ -84,15 +109,32 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, err
 	}
 	// 1. Add the block to staged area in order.
 	bc.addToStagedArea(Block)
+
+	var committed []*pb.Block
+	var deleted []*pb.Block
 	// 2. try commit to chain if it matches the last block.
 	if mao_utils.IsSameBytes(Block.Content.PrevHash, bc.GetLastBlock().CurHash) {
 		// Scan staging area and 1. Remove all invalid. 2. commit all can be connected.
-		cur := bc.Staged
-		for cur.Next != nil {
-			// if cur.Value.Content.SeqNumber < len(bc.Chain) - 1 {
-			// 	RemoveStagedBlock
-			// }
+		cur := bc.Staged.Next
+		for cur != nil && cur.Next != nil {
+			if cur.Value.Content.SeqNumber > int32(bc.GetLastIndex() + 1) {
+				break
+			}
+
+			if cur.Value.Content.SeqNumber <= int32(bc.GetLastIndex()) {
+				// The staged area conflict with chain, thus remove.
+				deleted = append(deleted, cur.Value)
+			 	cur = RemoveStagedBlock(cur)
+			} else if cur.Value.Content.SeqNumber == int32(bc.GetLastIndex() + 1) {
+				// Try to commit if hash matches.
+				if mao_utils.IsSameBytes(cur.Value.Content.PrevHash, bc.GetLastBlock().CurHash) {
+					committed = append(committed, cur.Value)
+					bc.Chain = append(bc.Chain, cur.Value)
+				}
+				cur = RemoveStagedBlock(cur)
+			}
+			cur = cur.Next
 		}
 	}
-	return nil, nil, nil
+	return committed, deleted, nil
 }
