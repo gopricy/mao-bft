@@ -31,6 +31,61 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+type TransactionStatus int32
+
+const (
+	TransactionStatus_UNKNOWN   TransactionStatus = 0
+	TransactionStatus_REJECTED  TransactionStatus = 1 // Transaction is rejected by leader.
+	TransactionStatus_PENDING   TransactionStatus = 2 // Transaction has been send from leader to followers.
+	TransactionStatus_STAGED    TransactionStatus = 3 // Transaction has been staged in blockchain, but not committed yet.
+	TransactionStatus_COMMITTED TransactionStatus = 4 // Transaction is committed in chain.
+)
+
+// Enum value maps for TransactionStatus.
+var (
+	TransactionStatus_name = map[int32]string{
+		0: "UNKNOWN",
+		1: "REJECTED",
+		2: "PENDING",
+		3: "STAGED",
+		4: "COMMITTED",
+	}
+	TransactionStatus_value = map[string]int32{
+		"UNKNOWN":   0,
+		"REJECTED":  1,
+		"PENDING":   2,
+		"STAGED":    3,
+		"COMMITTED": 4,
+	}
+)
+
+func (x TransactionStatus) Enum() *TransactionStatus {
+	p := new(TransactionStatus)
+	*p = x
+	return p
+}
+
+func (x TransactionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TransactionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_maobft_proto_enumTypes[0].Descriptor()
+}
+
+func (TransactionStatus) Type() protoreflect.EnumType {
+	return &file_maobft_proto_enumTypes[0]
+}
+
+func (x TransactionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TransactionStatus.Descriptor instead.
+func (TransactionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{0}
+}
+
 // A merkle proof is a data structure that proves a content is stored in the Merkle tree.
 type MerkleProof struct {
 	state         protoimpl.MessageState
@@ -396,20 +451,87 @@ func (x *SimpleKeyValueStoreMessage) GetValue() string {
 	return ""
 }
 
+// This message contains the message for a simple wire system.
+type WireMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	FromId string `protobuf:"bytes,1,opt,name=from_id,json=fromId,proto3" json:"from_id,omitempty"`
+	ToId   string `protobuf:"bytes,2,opt,name=to_id,json=toId,proto3" json:"to_id,omitempty"`
+	Amount int32  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+}
+
+func (x *WireMessage) Reset() {
+	*x = WireMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *WireMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WireMessage) ProtoMessage() {}
+
+func (x *WireMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WireMessage.ProtoReflect.Descriptor instead.
+func (*WireMessage) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *WireMessage) GetFromId() string {
+	if x != nil {
+		return x.FromId
+	}
+	return ""
+}
+
+func (x *WireMessage) GetToId() string {
+	if x != nil {
+		return x.ToId
+	}
+	return ""
+}
+
+func (x *WireMessage) GetAmount() int32 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
 type Transaction struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Optional, unique identifier of a transaction.
+	TransactionUuid string `protobuf:"bytes,1,opt,name=transaction_uuid,json=transactionUuid,proto3" json:"transaction_uuid,omitempty"`
 	// Types that are assignable to Message:
-	//	*Transaction_KvPair
+	//	*Transaction_KvPairMsg
+	//	*Transaction_WireMsg
 	Message isTransaction_Message `protobuf_oneof:"message"`
 }
 
 func (x *Transaction) Reset() {
 	*x = Transaction{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[6]
+		mi := &file_maobft_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -422,7 +544,7 @@ func (x *Transaction) String() string {
 func (*Transaction) ProtoMessage() {}
 
 func (x *Transaction) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[6]
+	mi := &file_maobft_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +557,14 @@ func (x *Transaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Transaction.ProtoReflect.Descriptor instead.
 func (*Transaction) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{6}
+	return file_maobft_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Transaction) GetTransactionUuid() string {
+	if x != nil {
+		return x.TransactionUuid
+	}
+	return ""
 }
 
 func (m *Transaction) GetMessage() isTransaction_Message {
@@ -445,9 +574,16 @@ func (m *Transaction) GetMessage() isTransaction_Message {
 	return nil
 }
 
-func (x *Transaction) GetKvPair() *SimpleKeyValueStoreMessage {
-	if x, ok := x.GetMessage().(*Transaction_KvPair); ok {
-		return x.KvPair
+func (x *Transaction) GetKvPairMsg() *SimpleKeyValueStoreMessage {
+	if x, ok := x.GetMessage().(*Transaction_KvPairMsg); ok {
+		return x.KvPairMsg
+	}
+	return nil
+}
+
+func (x *Transaction) GetWireMsg() *WireMessage {
+	if x, ok := x.GetMessage().(*Transaction_WireMsg); ok {
+		return x.WireMsg
 	}
 	return nil
 }
@@ -456,12 +592,17 @@ type isTransaction_Message interface {
 	isTransaction_Message()
 }
 
-type Transaction_KvPair struct {
-	// This message is used to implement simple key value store.
-	KvPair *SimpleKeyValueStoreMessage `protobuf:"bytes,1,opt,name=kv_pair,json=kvPair,proto3,oneof"`
+type Transaction_KvPairMsg struct {
+	KvPairMsg *SimpleKeyValueStoreMessage `protobuf:"bytes,2,opt,name=kv_pair_msg,json=kvPairMsg,proto3,oneof"`
 }
 
-func (*Transaction_KvPair) isTransaction_Message() {}
+type Transaction_WireMsg struct {
+	WireMsg *WireMessage `protobuf:"bytes,3,opt,name=wire_msg,json=wireMsg,proto3,oneof"`
+}
+
+func (*Transaction_KvPairMsg) isTransaction_Message() {}
+
+func (*Transaction_WireMsg) isTransaction_Message() {}
 
 type PrepareResponse struct {
 	state         protoimpl.MessageState
@@ -472,7 +613,7 @@ type PrepareResponse struct {
 func (x *PrepareResponse) Reset() {
 	*x = PrepareResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[7]
+		mi := &file_maobft_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -485,7 +626,7 @@ func (x *PrepareResponse) String() string {
 func (*PrepareResponse) ProtoMessage() {}
 
 func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[7]
+	mi := &file_maobft_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -498,7 +639,7 @@ func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareResponse.ProtoReflect.Descriptor instead.
 func (*PrepareResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{7}
+	return file_maobft_proto_rawDescGZIP(), []int{8}
 }
 
 type EchoResponse struct {
@@ -510,7 +651,7 @@ type EchoResponse struct {
 func (x *EchoResponse) Reset() {
 	*x = EchoResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[8]
+		mi := &file_maobft_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -523,7 +664,7 @@ func (x *EchoResponse) String() string {
 func (*EchoResponse) ProtoMessage() {}
 
 func (x *EchoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[8]
+	mi := &file_maobft_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -536,7 +677,7 @@ func (x *EchoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EchoResponse.ProtoReflect.Descriptor instead.
 func (*EchoResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{8}
+	return file_maobft_proto_rawDescGZIP(), []int{9}
 }
 
 type ReadyRequest struct {
@@ -550,7 +691,7 @@ type ReadyRequest struct {
 func (x *ReadyRequest) Reset() {
 	*x = ReadyRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[9]
+		mi := &file_maobft_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -563,7 +704,7 @@ func (x *ReadyRequest) String() string {
 func (*ReadyRequest) ProtoMessage() {}
 
 func (x *ReadyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[9]
+	mi := &file_maobft_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -576,7 +717,7 @@ func (x *ReadyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadyRequest.ProtoReflect.Descriptor instead.
 func (*ReadyRequest) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{9}
+	return file_maobft_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ReadyRequest) GetMerkleRoot() []byte {
@@ -595,7 +736,7 @@ type ReadyResponse struct {
 func (x *ReadyResponse) Reset() {
 	*x = ReadyResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[10]
+		mi := &file_maobft_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -608,7 +749,7 @@ func (x *ReadyResponse) String() string {
 func (*ReadyResponse) ProtoMessage() {}
 
 func (x *ReadyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[10]
+	mi := &file_maobft_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -621,7 +762,196 @@ func (x *ReadyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadyResponse.ProtoReflect.Descriptor instead.
 func (*ReadyResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{10}
+	return file_maobft_proto_rawDescGZIP(), []int{11}
+}
+
+type ProposeTransactionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Transaction *Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"` // TODO(chenweilunster): Implement client signature authentication.
+}
+
+func (x *ProposeTransactionRequest) Reset() {
+	*x = ProposeTransactionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ProposeTransactionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProposeTransactionRequest) ProtoMessage() {}
+
+func (x *ProposeTransactionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProposeTransactionRequest.ProtoReflect.Descriptor instead.
+func (*ProposeTransactionRequest) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ProposeTransactionRequest) GetTransaction() *Transaction {
+	if x != nil {
+		return x.Transaction
+	}
+	return nil
+}
+
+type ProposeTransactionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Server assigned uuid for this transaction. This transaction is used to get transaction status.
+	TransactionUuid string `protobuf:"bytes,1,opt,name=transaction_uuid,json=transactionUuid,proto3" json:"transaction_uuid,omitempty"`
+}
+
+func (x *ProposeTransactionResponse) Reset() {
+	*x = ProposeTransactionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ProposeTransactionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProposeTransactionResponse) ProtoMessage() {}
+
+func (x *ProposeTransactionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProposeTransactionResponse.ProtoReflect.Descriptor instead.
+func (*ProposeTransactionResponse) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ProposeTransactionResponse) GetTransactionUuid() string {
+	if x != nil {
+		return x.TransactionUuid
+	}
+	return ""
+}
+
+type GetTransactionStatusRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	TransactionUuid string `protobuf:"bytes,1,opt,name=transaction_uuid,json=transactionUuid,proto3" json:"transaction_uuid,omitempty"`
+}
+
+func (x *GetTransactionStatusRequest) Reset() {
+	*x = GetTransactionStatusRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransactionStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransactionStatusRequest) ProtoMessage() {}
+
+func (x *GetTransactionStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransactionStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetTransactionStatusRequest) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetTransactionStatusRequest) GetTransactionUuid() string {
+	if x != nil {
+		return x.TransactionUuid
+	}
+	return ""
+}
+
+type GetTransactionStatusResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status TransactionStatus `protobuf:"varint,1,opt,name=status,proto3,enum=pb.TransactionStatus" json:"status,omitempty"`
+}
+
+func (x *GetTransactionStatusResponse) Reset() {
+	*x = GetTransactionStatusResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetTransactionStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTransactionStatusResponse) ProtoMessage() {}
+
+func (x *GetTransactionStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTransactionStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetTransactionStatusResponse) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetTransactionStatusResponse) GetStatus() TransactionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TransactionStatus_UNKNOWN
 }
 
 var File_maobft_proto protoreflect.FileDescriptor
@@ -661,18 +991,54 @@ var file_maobft_proto_rawDesc = []byte{
 	0x75, 0x65, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x10,
 	0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79,
 	0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x53, 0x0a, 0x0b, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61,
-	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x39, 0x0a, 0x07, 0x6b, 0x76, 0x5f, 0x70, 0x61, 0x69, 0x72,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x70, 0x62, 0x2e, 0x53, 0x69, 0x6d, 0x70,
-	0x6c, 0x65, 0x4b, 0x65, 0x79, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x4d,
-	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x06, 0x6b, 0x76, 0x50, 0x61, 0x69, 0x72,
-	0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x11, 0x0a, 0x0f, 0x50,
-	0x72, 0x65, 0x70, 0x61, 0x72, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x0e,
-	0x0a, 0x0c, 0x45, 0x63, 0x68, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2f,
-	0x0a, 0x0c, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1f,
-	0x0a, 0x0b, 0x6d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x5f, 0x72, 0x6f, 0x6f, 0x74, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x0a, 0x6d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x52, 0x6f, 0x6f, 0x74, 0x22,
-	0x0f, 0x0a, 0x0d, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x53, 0x0a, 0x0b, 0x57, 0x69, 0x72, 0x65, 0x4d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x17, 0x0a, 0x07, 0x66, 0x72, 0x6f, 0x6d, 0x5f, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x66, 0x72, 0x6f, 0x6d, 0x49, 0x64, 0x12, 0x13,
+	0x0a, 0x05, 0x74, 0x6f, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74,
+	0x6f, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0xb3, 0x01, 0x0a, 0x0b,
+	0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x29, 0x0a, 0x10, 0x74,
+	0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x75, 0x75, 0x69, 0x64, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x55, 0x75, 0x69, 0x64, 0x12, 0x40, 0x0a, 0x0b, 0x6b, 0x76, 0x5f, 0x70, 0x61, 0x69,
+	0x72, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x70, 0x62,
+	0x2e, 0x53, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x4b, 0x65, 0x79, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x53,
+	0x74, 0x6f, 0x72, 0x65, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x09, 0x6b,
+	0x76, 0x50, 0x61, 0x69, 0x72, 0x4d, 0x73, 0x67, 0x12, 0x2c, 0x0a, 0x08, 0x77, 0x69, 0x72, 0x65,
+	0x5f, 0x6d, 0x73, 0x67, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x70, 0x62, 0x2e,
+	0x57, 0x69, 0x72, 0x65, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x07, 0x77,
+	0x69, 0x72, 0x65, 0x4d, 0x73, 0x67, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x22, 0x11, 0x0a, 0x0f, 0x50, 0x72, 0x65, 0x70, 0x61, 0x72, 0x65, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x0e, 0x0a, 0x0c, 0x45, 0x63, 0x68, 0x6f, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2f, 0x0a, 0x0c, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x6d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x5f, 0x72,
+	0x6f, 0x6f, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x6d, 0x65, 0x72, 0x6b, 0x6c,
+	0x65, 0x52, 0x6f, 0x6f, 0x74, 0x22, 0x0f, 0x0a, 0x0d, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x4e, 0x0a, 0x19, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73,
+	0x65, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x12, 0x31, 0x0a, 0x0b, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x70, 0x62, 0x2e, 0x54, 0x72,
+	0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0b, 0x74, 0x72, 0x61, 0x6e, 0x73,
+	0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x47, 0x0a, 0x1a, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73,
+	0x65, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x29, 0x0a, 0x10, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74,
+	0x69, 0x6f, 0x6e, 0x5f, 0x75, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f,
+	0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x55, 0x75, 0x69, 0x64, 0x22,
+	0x48, 0x0a, 0x1b, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f,
+	0x6e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x29,
+	0x0a, 0x10, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x75, 0x75,
+	0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61,
+	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x55, 0x75, 0x69, 0x64, 0x22, 0x4d, 0x0a, 0x1c, 0x47, 0x65, 0x74,
+	0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x75,
+	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2d, 0x0a, 0x06, 0x73, 0x74, 0x61,
+	0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x15, 0x2e, 0x70, 0x62, 0x2e, 0x54,
+	0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73,
+	0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x2a, 0x56, 0x0a, 0x11, 0x54, 0x72, 0x61, 0x6e,
+	0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x0b, 0x0a,
+	0x07, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x12, 0x0c, 0x0a, 0x08, 0x52, 0x45,
+	0x4a, 0x45, 0x43, 0x54, 0x45, 0x44, 0x10, 0x01, 0x12, 0x0b, 0x0a, 0x07, 0x50, 0x45, 0x4e, 0x44,
+	0x49, 0x4e, 0x47, 0x10, 0x02, 0x12, 0x0a, 0x0a, 0x06, 0x53, 0x54, 0x41, 0x47, 0x45, 0x44, 0x10,
+	0x03, 0x12, 0x0d, 0x0a, 0x09, 0x43, 0x4f, 0x4d, 0x4d, 0x49, 0x54, 0x54, 0x45, 0x44, 0x10, 0x04,
 	0x32, 0x38, 0x0a, 0x07, 0x50, 0x72, 0x65, 0x70, 0x61, 0x72, 0x65, 0x12, 0x2d, 0x0a, 0x07, 0x50,
 	0x72, 0x65, 0x70, 0x61, 0x72, 0x65, 0x12, 0x0b, 0x2e, 0x70, 0x62, 0x2e, 0x50, 0x61, 0x79, 0x6c,
 	0x6f, 0x61, 0x64, 0x1a, 0x13, 0x2e, 0x70, 0x62, 0x2e, 0x50, 0x72, 0x65, 0x70, 0x61, 0x72, 0x65,
@@ -683,7 +1049,20 @@ var file_maobft_proto_rawDesc = []byte{
 	0x65, 0x61, 0x64, 0x79, 0x12, 0x2e, 0x0a, 0x05, 0x52, 0x65, 0x61, 0x64, 0x79, 0x12, 0x10, 0x2e,
 	0x70, 0x62, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
 	0x11, 0x2e, 0x70, 0x62, 0x2e, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
-	0x73, 0x65, 0x22, 0x00, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x65, 0x22, 0x00, 0x32, 0xc8, 0x01, 0x0a, 0x12, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x55, 0x0a, 0x12, 0x50,
+	0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f,
+	0x6e, 0x12, 0x1d, 0x2e, 0x70, 0x62, 0x2e, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x54, 0x72,
+	0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x1a, 0x1e, 0x2e, 0x70, 0x62, 0x2e, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x54, 0x72, 0x61,
+	0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x22, 0x00, 0x12, 0x5b, 0x0a, 0x14, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x1f, 0x2e, 0x70, 0x62, 0x2e,
+	0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x74,
+	0x61, 0x74, 0x75, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x20, 0x2e, 0x70, 0x62,
+	0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x53,
+	0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x62,
+	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -698,37 +1077,51 @@ func file_maobft_proto_rawDescGZIP() []byte {
 	return file_maobft_proto_rawDescData
 }
 
-var file_maobft_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_maobft_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_maobft_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_maobft_proto_goTypes = []interface{}{
-	(*MerkleProof)(nil),                // 0: pb.MerkleProof
-	(*ProofPair)(nil),                  // 1: pb.ProofPair
-	(*Payload)(nil),                    // 2: pb.Payload
-	(*Block)(nil),                      // 3: pb.Block
-	(*BlockContent)(nil),               // 4: pb.BlockContent
-	(*SimpleKeyValueStoreMessage)(nil), // 5: pb.SimpleKeyValueStoreMessage
-	(*Transaction)(nil),                // 6: pb.Transaction
-	(*PrepareResponse)(nil),            // 7: pb.PrepareResponse
-	(*EchoResponse)(nil),               // 8: pb.EchoResponse
-	(*ReadyRequest)(nil),               // 9: pb.ReadyRequest
-	(*ReadyResponse)(nil),              // 10: pb.ReadyResponse
+	(TransactionStatus)(0),               // 0: pb.TransactionStatus
+	(*MerkleProof)(nil),                  // 1: pb.MerkleProof
+	(*ProofPair)(nil),                    // 2: pb.ProofPair
+	(*Payload)(nil),                      // 3: pb.Payload
+	(*Block)(nil),                        // 4: pb.Block
+	(*BlockContent)(nil),                 // 5: pb.BlockContent
+	(*SimpleKeyValueStoreMessage)(nil),   // 6: pb.SimpleKeyValueStoreMessage
+	(*WireMessage)(nil),                  // 7: pb.WireMessage
+	(*Transaction)(nil),                  // 8: pb.Transaction
+	(*PrepareResponse)(nil),              // 9: pb.PrepareResponse
+	(*EchoResponse)(nil),                 // 10: pb.EchoResponse
+	(*ReadyRequest)(nil),                 // 11: pb.ReadyRequest
+	(*ReadyResponse)(nil),                // 12: pb.ReadyResponse
+	(*ProposeTransactionRequest)(nil),    // 13: pb.ProposeTransactionRequest
+	(*ProposeTransactionResponse)(nil),   // 14: pb.ProposeTransactionResponse
+	(*GetTransactionStatusRequest)(nil),  // 15: pb.GetTransactionStatusRequest
+	(*GetTransactionStatusResponse)(nil), // 16: pb.GetTransactionStatusResponse
 }
 var file_maobft_proto_depIdxs = []int32{
-	1,  // 0: pb.MerkleProof.proof_pairs:type_name -> pb.ProofPair
-	0,  // 1: pb.Payload.merkle_proof:type_name -> pb.MerkleProof
-	4,  // 2: pb.Block.content:type_name -> pb.BlockContent
-	6,  // 3: pb.BlockContent.txs:type_name -> pb.Transaction
-	5,  // 4: pb.Transaction.kv_pair:type_name -> pb.SimpleKeyValueStoreMessage
-	2,  // 5: pb.Prepare.Prepare:input_type -> pb.Payload
-	2,  // 6: pb.Echo.Echo:input_type -> pb.Payload
-	9,  // 7: pb.Ready.Ready:input_type -> pb.ReadyRequest
-	7,  // 8: pb.Prepare.Prepare:output_type -> pb.PrepareResponse
-	8,  // 9: pb.Echo.Echo:output_type -> pb.EchoResponse
-	10, // 10: pb.Ready.Ready:output_type -> pb.ReadyResponse
-	8,  // [8:11] is the sub-list for method output_type
-	5,  // [5:8] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	2,  // 0: pb.MerkleProof.proof_pairs:type_name -> pb.ProofPair
+	1,  // 1: pb.Payload.merkle_proof:type_name -> pb.MerkleProof
+	5,  // 2: pb.Block.content:type_name -> pb.BlockContent
+	8,  // 3: pb.BlockContent.txs:type_name -> pb.Transaction
+	6,  // 4: pb.Transaction.kv_pair_msg:type_name -> pb.SimpleKeyValueStoreMessage
+	7,  // 5: pb.Transaction.wire_msg:type_name -> pb.WireMessage
+	8,  // 6: pb.ProposeTransactionRequest.transaction:type_name -> pb.Transaction
+	0,  // 7: pb.GetTransactionStatusResponse.status:type_name -> pb.TransactionStatus
+	3,  // 8: pb.Prepare.Prepare:input_type -> pb.Payload
+	3,  // 9: pb.Echo.Echo:input_type -> pb.Payload
+	11, // 10: pb.Ready.Ready:input_type -> pb.ReadyRequest
+	13, // 11: pb.TransactionService.ProposeTransaction:input_type -> pb.ProposeTransactionRequest
+	15, // 12: pb.TransactionService.GetTransactionStatus:input_type -> pb.GetTransactionStatusRequest
+	9,  // 13: pb.Prepare.Prepare:output_type -> pb.PrepareResponse
+	10, // 14: pb.Echo.Echo:output_type -> pb.EchoResponse
+	12, // 15: pb.Ready.Ready:output_type -> pb.ReadyResponse
+	14, // 16: pb.TransactionService.ProposeTransaction:output_type -> pb.ProposeTransactionResponse
+	16, // 17: pb.TransactionService.GetTransactionStatus:output_type -> pb.GetTransactionStatusResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_maobft_proto_init() }
@@ -810,7 +1203,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Transaction); i {
+			switch v := v.(*WireMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -822,7 +1215,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PrepareResponse); i {
+			switch v := v.(*Transaction); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -834,7 +1227,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*EchoResponse); i {
+			switch v := v.(*PrepareResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -846,7 +1239,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadyRequest); i {
+			switch v := v.(*EchoResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -858,6 +1251,18 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ReadyRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_maobft_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ReadyResponse); i {
 			case 0:
 				return &v.state
@@ -869,22 +1274,72 @@ func file_maobft_proto_init() {
 				return nil
 			}
 		}
+		file_maobft_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ProposeTransactionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_maobft_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ProposeTransactionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_maobft_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTransactionStatusRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_maobft_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTransactionStatusResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
-	file_maobft_proto_msgTypes[6].OneofWrappers = []interface{}{
-		(*Transaction_KvPair)(nil),
+	file_maobft_proto_msgTypes[7].OneofWrappers = []interface{}{
+		(*Transaction_KvPairMsg)(nil),
+		(*Transaction_WireMsg)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_maobft_proto_rawDesc,
-			NumEnums:      0,
-			NumMessages:   11,
+			NumEnums:      1,
+			NumMessages:   16,
 			NumExtensions: 0,
-			NumServices:   3,
+			NumServices:   4,
 		},
 		GoTypes:           file_maobft_proto_goTypes,
 		DependencyIndexes: file_maobft_proto_depIdxs,
+		EnumInfos:         file_maobft_proto_enumTypes,
 		MessageInfos:      file_maobft_proto_msgTypes,
 	}.Build()
 	File_maobft_proto = out.File
@@ -1111,6 +1566,118 @@ var _Ready_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Ready",
 			Handler:    _Ready_Ready_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "maobft.proto",
+}
+
+// TransactionServiceClient is the client API for TransactionService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type TransactionServiceClient interface {
+	// ProposeTransaction allows a client to propose a transaction.
+	ProposeTransaction(ctx context.Context, in *ProposeTransactionRequest, opts ...grpc.CallOption) (*ProposeTransactionResponse, error)
+	// GetTransactionStatus returns status of transaction.
+	GetTransactionStatus(ctx context.Context, in *GetTransactionStatusRequest, opts ...grpc.CallOption) (*GetTransactionStatusResponse, error)
+}
+
+type transactionServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewTransactionServiceClient(cc grpc.ClientConnInterface) TransactionServiceClient {
+	return &transactionServiceClient{cc}
+}
+
+func (c *transactionServiceClient) ProposeTransaction(ctx context.Context, in *ProposeTransactionRequest, opts ...grpc.CallOption) (*ProposeTransactionResponse, error) {
+	out := new(ProposeTransactionResponse)
+	err := c.cc.Invoke(ctx, "/pb.TransactionService/ProposeTransaction", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *transactionServiceClient) GetTransactionStatus(ctx context.Context, in *GetTransactionStatusRequest, opts ...grpc.CallOption) (*GetTransactionStatusResponse, error) {
+	out := new(GetTransactionStatusResponse)
+	err := c.cc.Invoke(ctx, "/pb.TransactionService/GetTransactionStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TransactionServiceServer is the server API for TransactionService service.
+type TransactionServiceServer interface {
+	// ProposeTransaction allows a client to propose a transaction.
+	ProposeTransaction(context.Context, *ProposeTransactionRequest) (*ProposeTransactionResponse, error)
+	// GetTransactionStatus returns status of transaction.
+	GetTransactionStatus(context.Context, *GetTransactionStatusRequest) (*GetTransactionStatusResponse, error)
+}
+
+// UnimplementedTransactionServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedTransactionServiceServer struct {
+}
+
+func (*UnimplementedTransactionServiceServer) ProposeTransaction(context.Context, *ProposeTransactionRequest) (*ProposeTransactionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProposeTransaction not implemented")
+}
+func (*UnimplementedTransactionServiceServer) GetTransactionStatus(context.Context, *GetTransactionStatusRequest) (*GetTransactionStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransactionStatus not implemented")
+}
+
+func RegisterTransactionServiceServer(s *grpc.Server, srv TransactionServiceServer) {
+	s.RegisterService(&_TransactionService_serviceDesc, srv)
+}
+
+func _TransactionService_ProposeTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProposeTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransactionServiceServer).ProposeTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.TransactionService/ProposeTransaction",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransactionServiceServer).ProposeTransaction(ctx, req.(*ProposeTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TransactionService_GetTransactionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTransactionStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransactionServiceServer).GetTransactionStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.TransactionService/GetTransactionStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransactionServiceServer).GetTransactionStatus(ctx, req.(*GetTransactionStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _TransactionService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "pb.TransactionService",
+	HandlerType: (*TransactionServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ProposeTransaction",
+			Handler:    _TransactionService_ProposeTransaction_Handler,
+		},
+		{
+			MethodName: "GetTransactionStatus",
+			Handler:    _TransactionService_GetTransactionStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

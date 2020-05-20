@@ -5,14 +5,12 @@ import (
 	"github.com/gopricy/mao-bft/erasure"
 	"github.com/gopricy/mao-bft/merkle"
 	"github.com/gopricy/mao-bft/pb"
+	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/peer"
 	"sync"
 )
 
-type Application interface{
-	RBCReceive([]byte) error
-}
 
 type Received struct{
 	// TODO: improve the efficiency with better locking
@@ -114,7 +112,11 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			if err != nil{
 				return nil, err
 			}
-			if err := c.App.RBCReceive(data); err != nil{
+			block, err := mao_utils.FromBytesToBlock(data)
+			if err != nil {
+				return nil, err
+			}
+			if err := c.App.RBCReceive(block); err != nil{
 				return nil, err
 			}
 		}
@@ -153,7 +155,11 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			if err != nil{
 				return nil, err
 			}
-			if err := c.App.RBCReceive(data); err != nil{
+			block, err := mao_utils.FromBytesToBlock(data)
+			if err != nil {
+				return nil, err
+			}
+			if err := c.App.RBCReceive(block); err != nil{
 				return nil, err
 			}
 		}

@@ -54,10 +54,27 @@ message SimpleKeyValueStoreMessage {
   string value = 2;
 }
 
+// This message contains the message for a simple wire system.
+message WireMessage {
+  string from_id = 1;
+  string to_id = 2;
+  int32 amount = 3;
+}
+
+// This message defines a deposit action performed by a administrative client.
+// TODO(chenweilunster): verify caller identity is administrator.
+message DepositMessage {
+  string account_id = 1;
+  int32 amount = 2;
+}
+
 message Transaction {
+  // Optional, unique identifier of a transaction.
+  string transaction_uuid = 1;
   oneof message {
-    // This message is used to implement simple key value store.
-    SimpleKeyValueStoreMessage kv_pair = 1;
+    SimpleKeyValueStoreMessage kv_pair_msg = 2;
+    WireMessage wire_msg = 3;
+    DepositMessage deposit_msg = 4;
   }
 }
 
@@ -83,4 +100,38 @@ service Echo{
 
 service Ready{
   rpc Ready(ReadyRequest) returns (ReadyResponse) {}
+}
+
+message ProposeTransactionRequest {
+  Transaction transaction = 1;
+  // TODO(chenweilunster): Implement client signature authentication.
+}
+
+message ProposeTransactionResponse {
+  // Server assigned uuid for this transaction. This transaction is used to get transaction status.
+  string transaction_uuid = 1;
+}
+
+enum TransactionStatus {
+  UNKNOWN = 0; // This usually mean transaction is queued but not RBC'ed.
+  REJECTED = 1; // Transaction is rejected by leader.
+  PENDING = 2; // Transaction has been send from leader to followers.
+  STAGED = 3; // Transaction has been staged in blockchain, but not committed yet.
+  COMMITTED = 4; // Transaction is committed in chain.
+}
+
+message GetTransactionStatusRequest {
+  string transaction_uuid = 1;
+}
+
+message GetTransactionStatusResponse {
+  TransactionStatus status = 1;
+}
+
+// ProposeTransaction is sent from client to leader.
+service TransactionService {
+  // ProposeTransaction allows a client to propose a transaction.
+  rpc ProposeTransaction(ProposeTransactionRequest) returns (ProposeTransactionResponse) {}
+  // GetTransactionStatus returns status of transaction.
+  rpc GetTransactionStatus(GetTransactionStatusRequest) returns (GetTransactionStatusResponse) {}
 }

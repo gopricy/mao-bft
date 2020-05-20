@@ -6,6 +6,7 @@ import (
 	"github.com/gopricy/mao-bft/pb"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"google.golang.org/protobuf/proto"
+	"sync"
 )
 
 type StagedBlock struct {
@@ -69,6 +70,8 @@ type Blockchain struct {
 	Chain []*pb.Block
 	// This list stores sorted blocks that are not committed. All blocks are sorted by sequence number.
 	Staged StagedBlock
+	// Access to blockchain should always be thread-safe.
+	Mu sync.RWMutex
 }
 
 func (bc *Blockchain) Init() {
@@ -100,20 +103,23 @@ func ValidateBlock(Block pb.Block) bool {
 	return mao_utils.IsSameBytes(h.Sum(nil), Block.CurHash)
 }
 
-// CommitBlock tries to apply a single block to block chain, return all blocks get applied.
+// CommitBlock tries to apply a single block to block chain, return all blocks get applied, removed,
+// and whether the input block is committed.
 // Note that, there could be multiple block gets applied in one shot.
-func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, error) {
+func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, bool,  error) {
 	// 0. Validate block.
 	if isValid := ValidateBlock(Block); isValid == false {
-		return nil, nil, errors.New("The block is not valid.")
+		return nil, nil, false, errors.New("The block is not valid.")
 	}
 	// 1. Add the block to staged area in order.
 	bc.addToStagedArea(Block)
 
 	var committed []*pb.Block
 	var deleted []*pb.Block
+	isApplied := false
 	// 2. try commit to chain if it matches the last block.
 	if mao_utils.IsSameBytes(Block.Content.PrevHash, bc.GetLastBlock().CurHash) {
+		isApplied = true
 		// Scan staging area and 1. Remove all invalid. 2. commit all can be connected.
 		cur := bc.Staged.Next
 		for cur != nil && cur.Next != nil {
@@ -136,5 +142,5 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, err
 			cur = cur.Next
 		}
 	}
-	return committed, deleted, nil
+	return committed, deleted, isApplied, nil
 }
