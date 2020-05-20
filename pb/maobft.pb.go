@@ -34,7 +34,7 @@ const _ = proto.ProtoPackageIsVersion4
 type TransactionStatus int32
 
 const (
-	TransactionStatus_UNKNOWN   TransactionStatus = 0
+	TransactionStatus_UNKNOWN   TransactionStatus = 0 // This usually mean transaction is queued but not RBC'ed.
 	TransactionStatus_REJECTED  TransactionStatus = 1 // Transaction is rejected by leader.
 	TransactionStatus_PENDING   TransactionStatus = 2 // Transaction has been send from leader to followers.
 	TransactionStatus_STAGED    TransactionStatus = 3 // Transaction has been staged in blockchain, but not committed yet.
@@ -515,6 +515,63 @@ func (x *WireMessage) GetAmount() int32 {
 	return 0
 }
 
+// This message defines a deposit action performed by a administrative client.
+// TODO(chenweilunster): verify caller identity is administrator.
+type DepositMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Amount    int32  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+}
+
+func (x *DepositMessage) Reset() {
+	*x = DepositMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_maobft_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DepositMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DepositMessage) ProtoMessage() {}
+
+func (x *DepositMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_maobft_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DepositMessage.ProtoReflect.Descriptor instead.
+func (*DepositMessage) Descriptor() ([]byte, []int) {
+	return file_maobft_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DepositMessage) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *DepositMessage) GetAmount() int32 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
 type Transaction struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -525,13 +582,14 @@ type Transaction struct {
 	// Types that are assignable to Message:
 	//	*Transaction_KvPairMsg
 	//	*Transaction_WireMsg
+	//	*Transaction_DepositMsg
 	Message isTransaction_Message `protobuf_oneof:"message"`
 }
 
 func (x *Transaction) Reset() {
 	*x = Transaction{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[7]
+		mi := &file_maobft_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -544,7 +602,7 @@ func (x *Transaction) String() string {
 func (*Transaction) ProtoMessage() {}
 
 func (x *Transaction) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[7]
+	mi := &file_maobft_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +615,7 @@ func (x *Transaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Transaction.ProtoReflect.Descriptor instead.
 func (*Transaction) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{7}
+	return file_maobft_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Transaction) GetTransactionUuid() string {
@@ -588,6 +646,13 @@ func (x *Transaction) GetWireMsg() *WireMessage {
 	return nil
 }
 
+func (x *Transaction) GetDepositMsg() *DepositMessage {
+	if x, ok := x.GetMessage().(*Transaction_DepositMsg); ok {
+		return x.DepositMsg
+	}
+	return nil
+}
+
 type isTransaction_Message interface {
 	isTransaction_Message()
 }
@@ -600,9 +665,15 @@ type Transaction_WireMsg struct {
 	WireMsg *WireMessage `protobuf:"bytes,3,opt,name=wire_msg,json=wireMsg,proto3,oneof"`
 }
 
+type Transaction_DepositMsg struct {
+	DepositMsg *DepositMessage `protobuf:"bytes,4,opt,name=deposit_msg,json=depositMsg,proto3,oneof"`
+}
+
 func (*Transaction_KvPairMsg) isTransaction_Message() {}
 
 func (*Transaction_WireMsg) isTransaction_Message() {}
+
+func (*Transaction_DepositMsg) isTransaction_Message() {}
 
 type PrepareResponse struct {
 	state         protoimpl.MessageState
@@ -613,7 +684,7 @@ type PrepareResponse struct {
 func (x *PrepareResponse) Reset() {
 	*x = PrepareResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[8]
+		mi := &file_maobft_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -626,7 +697,7 @@ func (x *PrepareResponse) String() string {
 func (*PrepareResponse) ProtoMessage() {}
 
 func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[8]
+	mi := &file_maobft_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -639,7 +710,7 @@ func (x *PrepareResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareResponse.ProtoReflect.Descriptor instead.
 func (*PrepareResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{8}
+	return file_maobft_proto_rawDescGZIP(), []int{9}
 }
 
 type EchoResponse struct {
@@ -651,7 +722,7 @@ type EchoResponse struct {
 func (x *EchoResponse) Reset() {
 	*x = EchoResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[9]
+		mi := &file_maobft_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -664,7 +735,7 @@ func (x *EchoResponse) String() string {
 func (*EchoResponse) ProtoMessage() {}
 
 func (x *EchoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[9]
+	mi := &file_maobft_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +748,7 @@ func (x *EchoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EchoResponse.ProtoReflect.Descriptor instead.
 func (*EchoResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{9}
+	return file_maobft_proto_rawDescGZIP(), []int{10}
 }
 
 type ReadyRequest struct {
@@ -691,7 +762,7 @@ type ReadyRequest struct {
 func (x *ReadyRequest) Reset() {
 	*x = ReadyRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[10]
+		mi := &file_maobft_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -704,7 +775,7 @@ func (x *ReadyRequest) String() string {
 func (*ReadyRequest) ProtoMessage() {}
 
 func (x *ReadyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[10]
+	mi := &file_maobft_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -717,7 +788,7 @@ func (x *ReadyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadyRequest.ProtoReflect.Descriptor instead.
 func (*ReadyRequest) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{10}
+	return file_maobft_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReadyRequest) GetMerkleRoot() []byte {
@@ -736,7 +807,7 @@ type ReadyResponse struct {
 func (x *ReadyResponse) Reset() {
 	*x = ReadyResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[11]
+		mi := &file_maobft_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -749,7 +820,7 @@ func (x *ReadyResponse) String() string {
 func (*ReadyResponse) ProtoMessage() {}
 
 func (x *ReadyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[11]
+	mi := &file_maobft_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -762,7 +833,7 @@ func (x *ReadyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadyResponse.ProtoReflect.Descriptor instead.
 func (*ReadyResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{11}
+	return file_maobft_proto_rawDescGZIP(), []int{12}
 }
 
 type ProposeTransactionRequest struct {
@@ -776,7 +847,7 @@ type ProposeTransactionRequest struct {
 func (x *ProposeTransactionRequest) Reset() {
 	*x = ProposeTransactionRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[12]
+		mi := &file_maobft_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -789,7 +860,7 @@ func (x *ProposeTransactionRequest) String() string {
 func (*ProposeTransactionRequest) ProtoMessage() {}
 
 func (x *ProposeTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[12]
+	mi := &file_maobft_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -802,7 +873,7 @@ func (x *ProposeTransactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProposeTransactionRequest.ProtoReflect.Descriptor instead.
 func (*ProposeTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{12}
+	return file_maobft_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ProposeTransactionRequest) GetTransaction() *Transaction {
@@ -824,7 +895,7 @@ type ProposeTransactionResponse struct {
 func (x *ProposeTransactionResponse) Reset() {
 	*x = ProposeTransactionResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[13]
+		mi := &file_maobft_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -837,7 +908,7 @@ func (x *ProposeTransactionResponse) String() string {
 func (*ProposeTransactionResponse) ProtoMessage() {}
 
 func (x *ProposeTransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[13]
+	mi := &file_maobft_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -850,7 +921,7 @@ func (x *ProposeTransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProposeTransactionResponse.ProtoReflect.Descriptor instead.
 func (*ProposeTransactionResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{13}
+	return file_maobft_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ProposeTransactionResponse) GetTransactionUuid() string {
@@ -871,7 +942,7 @@ type GetTransactionStatusRequest struct {
 func (x *GetTransactionStatusRequest) Reset() {
 	*x = GetTransactionStatusRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[14]
+		mi := &file_maobft_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -884,7 +955,7 @@ func (x *GetTransactionStatusRequest) String() string {
 func (*GetTransactionStatusRequest) ProtoMessage() {}
 
 func (x *GetTransactionStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[14]
+	mi := &file_maobft_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +968,7 @@ func (x *GetTransactionStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTransactionStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetTransactionStatusRequest) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{14}
+	return file_maobft_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetTransactionStatusRequest) GetTransactionUuid() string {
@@ -918,7 +989,7 @@ type GetTransactionStatusResponse struct {
 func (x *GetTransactionStatusResponse) Reset() {
 	*x = GetTransactionStatusResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_maobft_proto_msgTypes[15]
+		mi := &file_maobft_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -931,7 +1002,7 @@ func (x *GetTransactionStatusResponse) String() string {
 func (*GetTransactionStatusResponse) ProtoMessage() {}
 
 func (x *GetTransactionStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maobft_proto_msgTypes[15]
+	mi := &file_maobft_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -944,7 +1015,7 @@ func (x *GetTransactionStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTransactionStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetTransactionStatusResponse) Descriptor() ([]byte, []int) {
-	return file_maobft_proto_rawDescGZIP(), []int{15}
+	return file_maobft_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetTransactionStatusResponse) GetStatus() TransactionStatus {
@@ -996,18 +1067,26 @@ var file_maobft_proto_rawDesc = []byte{
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x66, 0x72, 0x6f, 0x6d, 0x49, 0x64, 0x12, 0x13,
 	0x0a, 0x05, 0x74, 0x6f, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74,
 	0x6f, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x03, 0x20,
-	0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0xb3, 0x01, 0x0a, 0x0b,
-	0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x29, 0x0a, 0x10, 0x74,
-	0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x75, 0x75, 0x69, 0x64, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69,
-	0x6f, 0x6e, 0x55, 0x75, 0x69, 0x64, 0x12, 0x40, 0x0a, 0x0b, 0x6b, 0x76, 0x5f, 0x70, 0x61, 0x69,
-	0x72, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x70, 0x62,
-	0x2e, 0x53, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x4b, 0x65, 0x79, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x53,
-	0x74, 0x6f, 0x72, 0x65, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x09, 0x6b,
-	0x76, 0x50, 0x61, 0x69, 0x72, 0x4d, 0x73, 0x67, 0x12, 0x2c, 0x0a, 0x08, 0x77, 0x69, 0x72, 0x65,
-	0x5f, 0x6d, 0x73, 0x67, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x70, 0x62, 0x2e,
-	0x57, 0x69, 0x72, 0x65, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x07, 0x77,
-	0x69, 0x72, 0x65, 0x4d, 0x73, 0x67, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x22, 0x47, 0x0a, 0x0e, 0x44,
+	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x1d, 0x0a,
+	0x0a, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x09, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06,
+	0x61, 0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x61, 0x6d,
+	0x6f, 0x75, 0x6e, 0x74, 0x22, 0xea, 0x01, 0x0a, 0x0b, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x12, 0x29, 0x0a, 0x10, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74,
+	0x69, 0x6f, 0x6e, 0x5f, 0x75, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f,
+	0x74, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x55, 0x75, 0x69, 0x64, 0x12,
+	0x40, 0x0a, 0x0b, 0x6b, 0x76, 0x5f, 0x70, 0x61, 0x69, 0x72, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x70, 0x62, 0x2e, 0x53, 0x69, 0x6d, 0x70, 0x6c, 0x65,
+	0x4b, 0x65, 0x79, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x53, 0x74, 0x6f, 0x72, 0x65, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x09, 0x6b, 0x76, 0x50, 0x61, 0x69, 0x72, 0x4d, 0x73,
+	0x67, 0x12, 0x2c, 0x0a, 0x08, 0x77, 0x69, 0x72, 0x65, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x70, 0x62, 0x2e, 0x57, 0x69, 0x72, 0x65, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x07, 0x77, 0x69, 0x72, 0x65, 0x4d, 0x73, 0x67, 0x12,
+	0x35, 0x0a, 0x0b, 0x64, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x5f, 0x6d, 0x73, 0x67, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x70, 0x62, 0x2e, 0x44, 0x65, 0x70, 0x6f, 0x73, 0x69,
+	0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x48, 0x00, 0x52, 0x0a, 0x64, 0x65, 0x70, 0x6f,
+	0x73, 0x69, 0x74, 0x4d, 0x73, 0x67, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
 	0x65, 0x22, 0x11, 0x0a, 0x0f, 0x50, 0x72, 0x65, 0x70, 0x61, 0x72, 0x65, 0x52, 0x65, 0x73, 0x70,
 	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x0e, 0x0a, 0x0c, 0x45, 0x63, 0x68, 0x6f, 0x52, 0x65, 0x73, 0x70,
 	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2f, 0x0a, 0x0c, 0x52, 0x65, 0x61, 0x64, 0x79, 0x52, 0x65, 0x71,
@@ -1078,7 +1157,7 @@ func file_maobft_proto_rawDescGZIP() []byte {
 }
 
 var file_maobft_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_maobft_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_maobft_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_maobft_proto_goTypes = []interface{}{
 	(TransactionStatus)(0),               // 0: pb.TransactionStatus
 	(*MerkleProof)(nil),                  // 1: pb.MerkleProof
@@ -1088,40 +1167,42 @@ var file_maobft_proto_goTypes = []interface{}{
 	(*BlockContent)(nil),                 // 5: pb.BlockContent
 	(*SimpleKeyValueStoreMessage)(nil),   // 6: pb.SimpleKeyValueStoreMessage
 	(*WireMessage)(nil),                  // 7: pb.WireMessage
-	(*Transaction)(nil),                  // 8: pb.Transaction
-	(*PrepareResponse)(nil),              // 9: pb.PrepareResponse
-	(*EchoResponse)(nil),                 // 10: pb.EchoResponse
-	(*ReadyRequest)(nil),                 // 11: pb.ReadyRequest
-	(*ReadyResponse)(nil),                // 12: pb.ReadyResponse
-	(*ProposeTransactionRequest)(nil),    // 13: pb.ProposeTransactionRequest
-	(*ProposeTransactionResponse)(nil),   // 14: pb.ProposeTransactionResponse
-	(*GetTransactionStatusRequest)(nil),  // 15: pb.GetTransactionStatusRequest
-	(*GetTransactionStatusResponse)(nil), // 16: pb.GetTransactionStatusResponse
+	(*DepositMessage)(nil),               // 8: pb.DepositMessage
+	(*Transaction)(nil),                  // 9: pb.Transaction
+	(*PrepareResponse)(nil),              // 10: pb.PrepareResponse
+	(*EchoResponse)(nil),                 // 11: pb.EchoResponse
+	(*ReadyRequest)(nil),                 // 12: pb.ReadyRequest
+	(*ReadyResponse)(nil),                // 13: pb.ReadyResponse
+	(*ProposeTransactionRequest)(nil),    // 14: pb.ProposeTransactionRequest
+	(*ProposeTransactionResponse)(nil),   // 15: pb.ProposeTransactionResponse
+	(*GetTransactionStatusRequest)(nil),  // 16: pb.GetTransactionStatusRequest
+	(*GetTransactionStatusResponse)(nil), // 17: pb.GetTransactionStatusResponse
 }
 var file_maobft_proto_depIdxs = []int32{
 	2,  // 0: pb.MerkleProof.proof_pairs:type_name -> pb.ProofPair
 	1,  // 1: pb.Payload.merkle_proof:type_name -> pb.MerkleProof
 	5,  // 2: pb.Block.content:type_name -> pb.BlockContent
-	8,  // 3: pb.BlockContent.txs:type_name -> pb.Transaction
+	9,  // 3: pb.BlockContent.txs:type_name -> pb.Transaction
 	6,  // 4: pb.Transaction.kv_pair_msg:type_name -> pb.SimpleKeyValueStoreMessage
 	7,  // 5: pb.Transaction.wire_msg:type_name -> pb.WireMessage
-	8,  // 6: pb.ProposeTransactionRequest.transaction:type_name -> pb.Transaction
-	0,  // 7: pb.GetTransactionStatusResponse.status:type_name -> pb.TransactionStatus
-	3,  // 8: pb.Prepare.Prepare:input_type -> pb.Payload
-	3,  // 9: pb.Echo.Echo:input_type -> pb.Payload
-	11, // 10: pb.Ready.Ready:input_type -> pb.ReadyRequest
-	13, // 11: pb.TransactionService.ProposeTransaction:input_type -> pb.ProposeTransactionRequest
-	15, // 12: pb.TransactionService.GetTransactionStatus:input_type -> pb.GetTransactionStatusRequest
-	9,  // 13: pb.Prepare.Prepare:output_type -> pb.PrepareResponse
-	10, // 14: pb.Echo.Echo:output_type -> pb.EchoResponse
-	12, // 15: pb.Ready.Ready:output_type -> pb.ReadyResponse
-	14, // 16: pb.TransactionService.ProposeTransaction:output_type -> pb.ProposeTransactionResponse
-	16, // 17: pb.TransactionService.GetTransactionStatus:output_type -> pb.GetTransactionStatusResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	8,  // 6: pb.Transaction.deposit_msg:type_name -> pb.DepositMessage
+	9,  // 7: pb.ProposeTransactionRequest.transaction:type_name -> pb.Transaction
+	0,  // 8: pb.GetTransactionStatusResponse.status:type_name -> pb.TransactionStatus
+	3,  // 9: pb.Prepare.Prepare:input_type -> pb.Payload
+	3,  // 10: pb.Echo.Echo:input_type -> pb.Payload
+	12, // 11: pb.Ready.Ready:input_type -> pb.ReadyRequest
+	14, // 12: pb.TransactionService.ProposeTransaction:input_type -> pb.ProposeTransactionRequest
+	16, // 13: pb.TransactionService.GetTransactionStatus:input_type -> pb.GetTransactionStatusRequest
+	10, // 14: pb.Prepare.Prepare:output_type -> pb.PrepareResponse
+	11, // 15: pb.Echo.Echo:output_type -> pb.EchoResponse
+	13, // 16: pb.Ready.Ready:output_type -> pb.ReadyResponse
+	15, // 17: pb.TransactionService.ProposeTransaction:output_type -> pb.ProposeTransactionResponse
+	17, // 18: pb.TransactionService.GetTransactionStatus:output_type -> pb.GetTransactionStatusResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_maobft_proto_init() }
@@ -1215,7 +1296,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Transaction); i {
+			switch v := v.(*DepositMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1227,7 +1308,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PrepareResponse); i {
+			switch v := v.(*Transaction); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1239,7 +1320,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*EchoResponse); i {
+			switch v := v.(*PrepareResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1251,7 +1332,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadyRequest); i {
+			switch v := v.(*EchoResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1263,7 +1344,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ReadyResponse); i {
+			switch v := v.(*ReadyRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1275,7 +1356,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ProposeTransactionRequest); i {
+			switch v := v.(*ReadyResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1287,7 +1368,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ProposeTransactionResponse); i {
+			switch v := v.(*ProposeTransactionRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1299,7 +1380,7 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetTransactionStatusRequest); i {
+			switch v := v.(*ProposeTransactionResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1311,6 +1392,18 @@ func file_maobft_proto_init() {
 			}
 		}
 		file_maobft_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GetTransactionStatusRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_maobft_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GetTransactionStatusResponse); i {
 			case 0:
 				return &v.state
@@ -1323,9 +1416,10 @@ func file_maobft_proto_init() {
 			}
 		}
 	}
-	file_maobft_proto_msgTypes[7].OneofWrappers = []interface{}{
+	file_maobft_proto_msgTypes[8].OneofWrappers = []interface{}{
 		(*Transaction_KvPairMsg)(nil),
 		(*Transaction_WireMsg)(nil),
+		(*Transaction_DepositMsg)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1333,7 +1427,7 @@ func file_maobft_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_maobft_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   4,
 		},
