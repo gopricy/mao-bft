@@ -14,13 +14,9 @@ type Application interface {
 	// Once a message is RBC'ed, this function will be called to apply this block.
 	// This function should be thread safe.
 	RBCReceive(block pb.Block) error
-	// Add transaction to event queue for processing. Return a unique id for the transaction & length of event queue.
-	// This function should be thread safe.
-	AddTransactionToEventQueue(transaction pb.Transaction) (string, int, error)
-	// Get a block to RBC, caller provides the maximum transaction a block can contain.
-	GetBlockToRBC(maxTx int) (pb.Block, error)
 	// Get status of a transaction by its uuid.
 	GetTransactionStatus(txUuid string) (pb.TransactionStatus, error)
+	// TODO(chenweilunster): Add validation functionality
 }
 
 // #############################################################
@@ -39,28 +35,10 @@ type EventQueue struct {
 	Mu sync.RWMutex
 }
 
-type WireSystem struct {
-	Application
-	// This is the blockchain the Wire system manages.
-	Blockchain blockchain.Blockchain
-	Queue EventQueue
-	Acnt Accounts
-}
-
-func (ws *WireSystem) Init() {
-	ws.Queue.Q = *list.New()
-	ws.Blockchain.Init()
-}
-
-func (ws *WireSystem) RBCReceive(block pb.Block) error {
-	ws.Blockchain.Mu.Lock()
-	defer ws.Blockchain.Mu.Unlock()
-	_, _, _, err := ws.Blockchain.CommitBlock(block)
-	return err
-}
-
-func (ws *WireSystem) AddTransactionToEventQueue(transaction pb.Transaction) (string, int, error) {
-	if transaction.TransactionUuid != "" {
+// Add a transaction to event queue, it assigns a UUID to input transaction.
+// This queue is managed by TransactionService.
+func (q *EventQueue) AddTxToEventQueue(tx pb.Transaction) (string, int, error) {
+	if tx.TransactionUuid != "" {
 		return "", 0, errors.New("uuid can not be set by client.")
 	}
 
@@ -69,24 +47,49 @@ func (ws *WireSystem) AddTransactionToEventQueue(transaction pb.Transaction) (st
 		return "", 0, err
 	}
 	uuidStr := id.String()
-	transaction.TransactionUuid = uuidStr
+	tx.TransactionUuid = uuidStr
 
-	ws.Queue.Mu.Lock()
-	defer ws.Queue.Mu.Unlock()
-	ws.Queue.Q.PushBack(transaction)
-	return uuidStr, ws.Queue.Q.Len(), nil
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
+	q.Q.PushBack(tx)
+	return uuidStr, q.Q.Len(), nil
 }
 
-func (ws *WireSystem) GetBlockToRBC(maxTx int) (pb.Block, error) {
-	if maxTx == 0 || ws.Queue.Q.Len() == 0 {
-		return pb.Block{}, errors.New("Block must contain more that 0 transactions")
-	}
-	ws.Queue.Mu.Lock()
-	defer ws.Queue.Mu.Unlock()
-	count := 0
+// Get a list of transactions to form a block. It returns a list of TXs to
+func (q *EventQueue) GetTxsToFormBlock(maxTx int) ([]pb.Transaction, error) {
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 
-	block := pb.Block{}
-	for ws.Queue.Q.Len() != 0 && count < maxTx {
+	if maxTx == 0 || q.Q.Len() == 0 {
+		return nil, errors.New("Block must contain more that 0 transactions")
 	}
-	return block, nil
+
+	count := 0
+	var res []pb.Transaction
+	for q.Q.Len() != 0 && count < maxTx {
+		tx := q.Q.Front()
+		res = append(res, tx.Value.(pb.Transaction))
+		q.Q.Remove(tx)
+	}
+	return res, nil
+}
+
+type WireSystem struct {
+	// This is the blockchain the Wire system manages.
+	Blockchain blockchain.Blockchain
+	Acnt Accounts
+}
+
+func (ws *WireSystem) Init() {
+	ws.Blockchain.Init()
+}
+
+func (ws *WireSystem) RBCReceive(block pb.Block) error {
+	// TODO(chenweilunster): IMPLEMENT ME
+	return nil
+}
+
+func (ws *WireSystem) GetTransactionStatus(txUuid string) (pb.TransactionStatus, error) {
+	// TODO(chenweilunster): IMPLEMENT ME
+	return pb.TransactionStatus_UNKNOWN, nil
 }

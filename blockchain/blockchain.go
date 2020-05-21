@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"container/list"
 	sha256 "crypto/sha256"
 	"errors"
 	"github.com/gopricy/mao-bft/pb"
@@ -70,6 +71,8 @@ type Blockchain struct {
 	Chain []*pb.Block
 	// This list stores sorted blocks that are not committed. All blocks are sorted by sequence number.
 	Staged StagedBlock
+	// This list stores pending blocks that is/will be broadcast. This should be concatenated to Chain.
+	Pending list.List
 	// Access to blockchain should always be thread-safe.
 	Mu sync.RWMutex
 }
@@ -78,6 +81,7 @@ func (bc *Blockchain) Init() {
 	// Add a sentinel node for both staged and blockchain.
 	bc.Chain = append(bc.Chain, &pb.Block{})
 	bc.Staged = StagedBlock{}
+	bc.Pending = *list.New()
 }
 
 func (bc *Blockchain) GetLastBlock() *pb.Block {
@@ -106,6 +110,7 @@ func ValidateBlock(Block pb.Block) bool {
 // CommitBlock tries to apply a single block to block chain, return all blocks get applied, removed,
 // and whether the input block is committed.
 // Note that, there could be multiple block gets applied in one shot.
+// TODO(chenweilunster): handle pending block case.
 func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, bool,  error) {
 	// 0. Validate block.
 	if isValid := ValidateBlock(Block); isValid == false {
@@ -143,4 +148,21 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, boo
 		}
 	}
 	return committed, deleted, isApplied, nil
+}
+
+// CreateNewPendingBlock creates a block at pending chain. Append the block to pending chain and returns.
+func (bc *Blockchain) CreateNewPendingBlock(txs []pb.Transaction) (pb.Block, error) {
+	bc.Mu.Lock()
+	defer bc.Mu.Unlock()
+	var lastBlock *pb.Block
+	lastBlock = bc.Chain[len(bc.Chain) - 1]
+	if bc.Pending.Len() != 0 {
+		lastBlock = bc.Pending.Back().Value.(*pb.Block)
+	}
+	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash, int32(lastBlock.Content.SeqNumber+1))
+	if err != nil {
+		return pb.Block{}, err
+	}
+	bc.Pending.PushBack(newBlock)
+	return newBlock, nil
 }

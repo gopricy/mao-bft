@@ -58,7 +58,10 @@ type Common struct {
 
 	ReadiesSent sync.Map
 
+	// Below are related to transaction system.
 	App Application
+	pb.UnimplementedTransactionServiceServer
+	Queue EventQueue
 }
 
 func (c *Common) reconstructData(root merkle.RootString) ([]byte, error){
@@ -171,3 +174,16 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 func (c *Common) Name() string{
 	return "Name() should be implemented by Leader/Follower"
 }
+
+func (c *Common) ProposeTransaction(
+	ctx context.Context, in *pb.ProposeTransactionRequest)(*pb.ProposeTransactionResponse, error) {
+	// TODO(chenweilunster): IMPLEMENT ME
+	return nil, nil
+}
+
+func (c *Common) GetTransactionStatus(
+	ctx context.Context, in *pb.GetTransactionStatusRequest) (*pb.GetTransactionStatusResponse, error) {
+	// TODO(chenweilunster): IMPLEMENT ME
+	return nil, nil
+}
+
