@@ -27,7 +27,7 @@ type MerkleTree struct {
 type RootString string
 
 // MerkleRootToString converts a merkle root to string
-func MerkleRootToString(mr []byte) RootString{
+func MerkleRootToString(mr []byte) RootString {
 	return RootString(hex.EncodeToString(mr))
 }
 

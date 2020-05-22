@@ -2,8 +2,8 @@ package erasure
 
 import (
 	"bytes"
-	"github.com/gopricy/mao-bft/merkle"
 	"github.com/gopricy/mao-bft/pb"
+	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/klauspost/reedsolomon"
 	"github.com/pkg/errors"
 )

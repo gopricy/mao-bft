@@ -4,15 +4,16 @@ import (
 	"container/list"
 	sha256 "crypto/sha256"
 	"errors"
+	"sync"
+
 	"github.com/gopricy/mao-bft/pb"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"google.golang.org/protobuf/proto"
-	"sync"
 )
 
 type StagedBlock struct {
-	Prev *StagedBlock
-	Next *StagedBlock
+	Prev  *StagedBlock
+	Next  *StagedBlock
 	Value *pb.Block
 }
 
@@ -34,8 +35,8 @@ func OrderedInsertToList(head *StagedBlock, Block pb.Block) bool {
 	}
 	// Insert after cur node.
 	newBlock := StagedBlock{
-		Prev: cur,
-		Next: cur.Next,
+		Prev:  cur,
+		Next:  cur.Next,
 		Value: &Block,
 	}
 	if cur.Next != nil {
@@ -85,7 +86,7 @@ func (bc *Blockchain) Init() {
 }
 
 func (bc *Blockchain) GetLastBlock() *pb.Block {
-	return bc.Chain[len(bc.Chain) - 1]
+	return bc.Chain[len(bc.Chain)-1]
 }
 
 func (bc *Blockchain) GetLastIndex() int {
@@ -111,7 +112,7 @@ func ValidateBlock(Block pb.Block) bool {
 // and whether the input block is committed.
 // Note that, there could be multiple block gets applied in one shot.
 // TODO(chenweilunster): handle pending block case.
-func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, bool,  error) {
+func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, bool, error) {
 	// 0. Validate block.
 	if isValid := ValidateBlock(Block); isValid == false {
 		return nil, nil, false, errors.New("The block is not valid.")
@@ -128,15 +129,15 @@ func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, boo
 		// Scan staging area and 1. Remove all invalid. 2. commit all can be connected.
 		cur := bc.Staged.Next
 		for cur != nil && cur.Next != nil {
-			if cur.Value.Content.SeqNumber > int32(bc.GetLastIndex() + 1) {
+			if cur.Value.Content.SeqNumber > int32(bc.GetLastIndex()+1) {
 				break
 			}
 
 			if cur.Value.Content.SeqNumber <= int32(bc.GetLastIndex()) {
 				// The staged area conflict with chain, thus remove.
 				deleted = append(deleted, cur.Value)
-			 	cur = RemoveStagedBlock(cur)
-			} else if cur.Value.Content.SeqNumber == int32(bc.GetLastIndex() + 1) {
+				cur = RemoveStagedBlock(cur)
+			} else if cur.Value.Content.SeqNumber == int32(bc.GetLastIndex()+1) {
 				// Try to commit if hash matches.
 				if mao_utils.IsSameBytes(cur.Value.Content.PrevHash, bc.GetLastBlock().CurHash) {
 					committed = append(committed, cur.Value)
@@ -155,11 +156,11 @@ func (bc *Blockchain) CreateNewPendingBlock(txs []pb.Transaction) (pb.Block, err
 	bc.Mu.Lock()
 	defer bc.Mu.Unlock()
 	var lastBlock *pb.Block
-	lastBlock = bc.Chain[len(bc.Chain) - 1]
+	lastBlock = bc.Chain[len(bc.Chain)-1]
 	if bc.Pending.Len() != 0 {
 		lastBlock = bc.Pending.Back().Value.(*pb.Block)
 	}
-	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash, int32(lastBlock.Content.SeqNumber+1))
+	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash, int(lastBlock.Content.SeqNumber)+1)
 	if err != nil {
 		return pb.Block{}, err
 	}

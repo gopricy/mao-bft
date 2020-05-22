@@ -2,46 +2,60 @@ package common
 
 import (
 	"context"
-	"github.com/gopricy/mao-bft/erasure"
-	"github.com/gopricy/mao-bft/merkle"
+	"sync"
+
 	"github.com/gopricy/mao-bft/pb"
+	"github.com/gopricy/mao-bft/rbc/erasure"
+	"github.com/gopricy/mao-bft/rbc/merkle"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/peer"
-	"sync"
 )
 
-
-type Received struct{
+type Received struct {
 	// TODO: improve the efficiency with better locking
 	rec map[merkle.RootString]map[string]interface{}
-	mu sync.Mutex
+	mu  sync.Mutex
 }
 
-func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error){
+func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
 	defer er.mu.Unlock()
 	root := merkle.MerkleRootToString(merkleRoot)
-	if _, ok := er.rec[root]; !ok{
+	if _, ok := er.rec[root]; !ok {
 		// if this message hasn't been seen
 		er.rec[root] = make(map[string]interface{})
 	}
-	if _, ok := er.rec[root][ip]; ok{
+	if _, ok := er.rec[root][ip]; ok {
 		return len(er.rec[root]), errors.New("Duplicate ECHO from same IP carrying same message")
 	}
 	er.rec[root][ip] = rec
 	return len(er.rec[root]), nil
 }
 
-type RBCSetting struct{
-	AllPeers []Peer
+type RBCSetting struct {
+	AllPeers       []Peer
 	ByzantineLimit int
 }
 
 // TODO: PERFORMANCE we probably want to keep the sessions with each peer
-type Peer struct{
-	IP string
+type Peer struct {
+	IP   string
 	PORT int
+	CONN *grpc.ClientConn
+}
+
+func (p *Peer) GetConn() *grpc.ClientConn {
+	for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
+		conn, err := createConnection(p.IP, p.PORT)
+		if err == nil {
+			p.CONN = conn
+			break
+		}
+	}
+	return p.CONN
 }
 
 // Common is a building block of follower and leader
@@ -64,16 +78,16 @@ type Common struct {
 	Queue EventQueue
 }
 
-func (c *Common) reconstructData(root merkle.RootString) ([]byte, error){
+func (c *Common) reconstructData(root merkle.RootString) ([]byte, error) {
 	payloads := []*pb.Payload{}
-	for _, m := range c.EchosReceived.rec[root]{
+	for _, m := range c.EchosReceived.rec[root] {
 		payloads = append(payloads, m.(*pb.Payload))
 	}
 	return erasure.Reconstruct(payloads, c.ByzantineLimit, len(c.AllPeers))
 }
 
-func (c *Common) readyIsSent(merkleroot []byte) bool{
-	if _, ok := c.ReadiesSent.Load(merkle.MerkleRootToString(merkleroot)); !ok{
+func (c *Common) readyIsSent(merkleroot []byte) bool {
+	if _, ok := c.ReadiesSent.Load(merkle.MerkleRootToString(merkleroot)); !ok {
 		c.ReadiesSent.Store(merkle.MerkleRootToString(merkleroot), struct{}{})
 		return false
 	}
@@ -83,7 +97,7 @@ func (c *Common) readyIsSent(merkleroot []byte) bool{
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
 	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(req.Data))
-	if !valid{
+	if !valid {
 		return nil, merkle.InvalidProof{}
 	}
 	// Echo calls
@@ -92,16 +106,16 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 		return nil, errors.New("Can't get PeerInfo")
 	}
 	e, err := c.EchosReceived.Add(p.Addr.String(), req.MerkleProof.Root, req)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
-	if e == len(c.RBCSetting.AllPeers) - c.ByzantineLimit{
+	if e == len(c.RBCSetting.AllPeers)-c.ByzantineLimit {
 		// TODO: interpolate {s'j} from any N-2f leaves received
 		// TODO: recompute Merkle root h' and if h'!=h then abort
-		if !c.readyIsSent(req.MerkleProof.Root){
-			for _, p := range c.RBCSetting.AllPeers{
-				err = c.SendReady(p, req.MerkleProof.Root)
-				if err != nil{
+		if !c.readyIsSent(req.MerkleProof.Root) {
+			for _, p := range c.RBCSetting.AllPeers {
+				c.SendReady(p, req.MerkleProof.Root)
+				if err != nil {
 					return nil, err
 				}
 			}
@@ -109,17 +123,17 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	}
 	rootString := merkle.MerkleRootToString(req.MerkleProof.Root)
 	// 2f + 1 Ready and N - 2f Echo, decode and apply
-	if e == len(c.RBCSetting.AllPeers) - 2 * c.ByzantineLimit{
-		if len(c.ReadiesReceived.rec[rootString]) >= 2 * c.ByzantineLimit + 1{
+	if e == len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
+		if len(c.ReadiesReceived.rec[rootString]) >= 2*c.ByzantineLimit+1 {
 			data, err := c.reconstructData(rootString)
-			if err != nil{
+			if err != nil {
 				return nil, err
 			}
 			block, err := mao_utils.FromBytesToBlock(data)
 			if err != nil {
 				return nil, err
 			}
-			if err := c.App.RBCReceive(block); err != nil{
+			if err := c.App.RBCReceive(block); err != nil {
 				return nil, err
 			}
 		}
@@ -136,33 +150,31 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 
 	// TODO: after getting f+1 READY: Send Ready if not Sent
 	r, err := c.ReadiesReceived.Add(p.Addr.String(), req.MerkleRoot, struct{}{})
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 
-	if r == c.ByzantineLimit + 1{
-		if !c.readyIsSent(req.MerkleRoot){
-			for _, p := range c.RBCSetting.AllPeers{
+	if r == c.ByzantineLimit+1 {
+		if !c.readyIsSent(req.MerkleRoot) {
+			for _, p := range c.RBCSetting.AllPeers {
 				// TODO: PERFORMANCE probably need an unblocking call for performance
-				if err = c.SendReady(p, req.MerkleRoot); err != nil{
-					return nil, err
-				}
+				c.SendReady(p, req.MerkleRoot)
 			}
 		}
 	}
 
 	merkleRoot := merkle.MerkleRootToString(req.MerkleRoot)
-	if r == 2 * c.ByzantineLimit + 1{
-		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.RBCSetting.AllPeers) - 2 * c.ByzantineLimit{
+	if r == 2*c.ByzantineLimit+1 {
+		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
 			data, err := c.reconstructData(merkleRoot)
-			if err != nil{
+			if err != nil {
 				return nil, err
 			}
 			block, err := mao_utils.FromBytesToBlock(data)
 			if err != nil {
 				return nil, err
 			}
-			if err := c.App.RBCReceive(block); err != nil{
+			if err := c.App.RBCReceive(block); err != nil {
 				return nil, err
 			}
 		}
@@ -171,12 +183,12 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	return &pb.ReadyResponse{}, nil
 }
 
-func (c *Common) Name() string{
+func (c *Common) Name() string {
 	return "Name() should be implemented by Leader/Follower"
 }
 
 func (c *Common) ProposeTransaction(
-	ctx context.Context, in *pb.ProposeTransactionRequest)(*pb.ProposeTransactionResponse, error) {
+	ctx context.Context, in *pb.ProposeTransactionRequest) (*pb.ProposeTransactionResponse, error) {
 	// TODO(chenweilunster): IMPLEMENT ME
 	return nil, nil
 }
@@ -186,4 +198,3 @@ func (c *Common) GetTransactionStatus(
 	// TODO(chenweilunster): IMPLEMENT ME
 	return nil, nil
 }
-

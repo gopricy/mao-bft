@@ -10,8 +10,8 @@ import (
 
 type Common interface {
 	Name() string
-	SendEcho(common.Peer, *pb.MerkleProof, []byte) error
-	SendReady(common.Peer, []byte) error
+	SendEcho(common.Peer, *pb.MerkleProof, []byte)
+	SendReady(common.Peer, []byte)
 	pb.ReadyServer
 	pb.EchoServer
 }
@@ -19,9 +19,9 @@ type Common interface {
 var _ Common = &common.Common{}
 
 type Mao interface {
-	SendPrepare(common.Peer, *pb.MerkleProof, []byte) error
+	SendPrepare(common.Peer, *pb.MerkleProof, []byte)
 	Common
-	RBCSend([]byte) error
+	RBCSend([]byte)
 }
 
 var _ Mao = &leader.Leader{}
