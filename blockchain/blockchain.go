@@ -167,3 +167,8 @@ func (bc *Blockchain) CreateNewPendingBlock(txs []pb.Transaction) (pb.Block, err
 	bc.Pending.PushBack(newBlock)
 	return newBlock, nil
 }
+
+func (bc *Blockchain) GetTransactionStatus(txUuid string) (pb.TransactionStatus, error) {
+	// TODO(chenweilunster): IMPLEMENT ME
+	return pb.TransactionStatus_UNKNOWN, nil
+}
