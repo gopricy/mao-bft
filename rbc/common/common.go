@@ -2,12 +2,14 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/erasure"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	mao_utils "github.com/gopricy/mao-bft/utils"
+	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -24,6 +26,9 @@ func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, err
 	er.mu.Lock()
 	defer er.mu.Unlock()
 	root := merkle.MerkleRootToString(merkleRoot)
+	if er.rec == nil{
+		er.rec = make(map[merkle.RootString]map[string]interface{})
+	}
 	if _, ok := er.rec[root]; !ok {
 		// if this message hasn't been seen
 		er.rec[root] = make(map[string]interface{})
@@ -36,15 +41,18 @@ func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, err
 }
 
 type RBCSetting struct {
-	AllPeers       []Peer
+	AllPeers       []*Peer
 	ByzantineLimit int
 }
 
-// TODO: PERFORMANCE we probably want to keep the sessions with each peer
 type Peer struct {
 	IP   string
 	PORT int
 	CONN *grpc.ClientConn
+}
+
+func (p *Peer) GoString() string{
+	return fmt.Sprintf("%d", p.PORT)
 }
 
 func (p *Peer) GetConn() *grpc.ClientConn {
@@ -62,6 +70,7 @@ func (p *Peer) GetConn() *grpc.ClientConn {
 type Common struct {
 	pb.UnimplementedEchoServer
 	pb.UnimplementedReadyServer
+	pb.UnimplementedPrepareServer
 	EchoClientWrapper
 	ReadyClientWrapper
 
@@ -70,12 +79,29 @@ type Common struct {
 	EchosReceived   Received
 	ReadiesReceived Received
 
+	NodeName string
 	ReadiesSent sync.Map
 
 	// Below are related to transaction system.
 	App Application
+
+	Logger *logging.Logger
+
+	// TODO: remove it from rbc
 	pb.UnimplementedTransactionServiceServer
 	Queue EventQueue
+}
+
+func NewCommon(name string, setting RBCSetting, app Application) Common{
+	//format := logging.MustStringFormatter(
+	//	`%{time:15:05:05} %{module} %{message}`
+	//)
+	//log := logging.NewLogBackend(os.Stdout, "name", 0)
+	return Common{RBCSetting: setting,
+		NodeName: name,
+		App: app,
+		Logger: logging.MustGetLogger(name),
+	}
 }
 
 func (c *Common) reconstructData(root merkle.RootString) ([]byte, error) {
@@ -94,6 +120,18 @@ func (c *Common) readyIsSent(merkleroot []byte) bool {
 	return true
 }
 
+func (c *Common) Name() string {
+	return c.NodeName
+}
+
+func (c *Common) Debugf(format string, args ...interface{}){
+	c.Logger.Debugf("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+}
+
+func (c *Common) Infof(format string, args ...interface{}){
+	c.Logger.Infof("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+}
+
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
 	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(req.Data))
@@ -105,6 +143,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	if !ok {
 		return nil, errors.New("Can't get PeerInfo")
 	}
+	c.Debugf(`Get ECHO Message with data "%s"`, req.Data)
 	e, err := c.EchosReceived.Add(p.Addr.String(), req.MerkleProof.Root, req)
 	if err != nil {
 		return nil, err
@@ -114,10 +153,8 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 		// TODO: recompute Merkle root h' and if h'!=h then abort
 		if !c.readyIsSent(req.MerkleProof.Root) {
 			for _, p := range c.RBCSetting.AllPeers {
+				c.Debugf("%s:")
 				c.SendReady(p, req.MerkleProof.Root)
-				if err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
@@ -183,8 +220,14 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	return &pb.ReadyResponse{}, nil
 }
 
-func (c *Common) Name() string {
-	return "Name() should be implemented by Leader/Follower"
+// Prepare serves Prepare messages sent from Leader
+func (c *Common) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareResponse, error) {
+	c.Debugf(`Get PREPARE: data "%s" in payload`, req.Data)
+	for _, p := range c.AllPeers {
+		c.Debugf(`Send ECHO with data "%s" to: %#v`, req.Data, p)
+		c.SendEcho(p, req.MerkleProof, req.Data)
+	}
+	return &pb.PrepareResponse{}, nil
 }
 
 func (c *Common) ProposeTransaction(

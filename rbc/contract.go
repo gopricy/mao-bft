@@ -10,25 +10,26 @@ import (
 
 type Common interface {
 	Name() string
-	SendEcho(common.Peer, *pb.MerkleProof, []byte)
-	SendReady(common.Peer, []byte)
+	SendEcho(*common.Peer, *pb.MerkleProof, []byte)
+	SendReady(*common.Peer, []byte)
 	pb.ReadyServer
 	pb.EchoServer
+	pb.PrepareServer
 }
 
 var _ Common = &common.Common{}
 
 type Mao interface {
-	SendPrepare(common.Peer, *pb.MerkleProof, []byte)
-	Common
+	SendPrepare(*common.Peer, *pb.MerkleProof, []byte)
 	RBCSend([]byte)
+	Common
 }
 
 var _ Mao = &leader.Leader{}
 
 type MaoFollower interface {
-	pb.PrepareServer
 	Common
 }
 
 var _MaoFollower = &follower.Follower{}
+

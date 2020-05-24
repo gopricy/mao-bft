@@ -12,12 +12,9 @@ type Leader struct {
 	common.PrepareClientWrapper
 }
 
-func NewLeader(name string, app common.Application) Leader {
-	return Leader{name: name, Common: common.Common{App: app}}
-}
-
-func (l *Leader) Name() string {
-	return l.name
+func NewLeader(name string, app common.Application, faultLimit int, peers []*common.Peer) Leader {
+	setting := common.RBCSetting{AllPeers: peers, ByzantineLimit: faultLimit}
+	return Leader{Common: common.NewCommon(name, setting, app)}
 }
 
 func (l *Leader) RBCSend(data []byte) {
@@ -31,9 +28,12 @@ func (l *Leader) RBCSend(data []byte) {
 	}
 
 	merkleTree := &merkle.MerkleTree{}
-	merkleTree.Init(contents)
+	if err := merkleTree.Init(contents); err != nil{
+		panic(err)
+	}
 
 	for i, p := range l.AllPeers {
+		l.Infof(`Send PREPARE "%s" to %#v`, splits[i], p)
 		proof, err := merkle.GetProof(merkleTree, contents[i])
 		if err != nil {
 			panic(err)

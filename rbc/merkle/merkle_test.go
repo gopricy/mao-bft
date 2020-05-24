@@ -137,12 +137,15 @@ func TestGetLeafIndex(t *testing.T) {
 	// Test 'a'
 	aProof, _ := GetProof(&tree, &testContent{x: "a"})
 	assert.Equal(t, GetLeafIndex(aProof), 0)
+	assert.Equal(t, true, VerifyProof(aProof, &testContent{x: "a"}))
 	// Test 'b'
 	bProof, _ := GetProof(&tree, &testContent{x: "b"})
 	assert.Equal(t, GetLeafIndex(bProof), 1)
+	assert.Equal(t, true, VerifyProof(bProof, &testContent{x: "b"}))
 	// Test 'c'
 	cProof, _ := GetProof(&tree, &testContent{x: "c"})
 	assert.Equal(t, GetLeafIndex(cProof), 2)
+	assert.Equal(t, true, VerifyProof(cProof, &testContent{x: "c"}))
 }
 
 func TestGetLeafIndex5NodeTree(t *testing.T) {

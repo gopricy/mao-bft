@@ -44,8 +44,8 @@ func (mf *MockFollower) Prepare(ctx context.Context, req *pb.Payload) (*pb.Prepa
 const port = 8000
 
 func TestEcho(t *testing.T) {
-	client := MockLeader{leader.NewLeader("L", nil)}
-	server := MockFollower{Follower: follower.NewFollower("F", nil)}
+	client := MockLeader{leader.NewLeader("L", nil, 1, nil)}
+	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil)}
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	assert.Nil(t, err)
 	s := grpc.NewServer()
@@ -55,7 +55,7 @@ func TestEcho(t *testing.T) {
 	pb.RegisterPrepareServer(s, &server)
 	go s.Serve(lis)
 
-	peer := common.Peer{IP: "127.0.0.1", PORT: 8000}
+	peer := &common.Peer{IP: "127.0.0.1", PORT: 8000}
 
 	client.SendPrepare(peer, &pb.MerkleProof{Root: []byte("root")}, []byte("prepare"))
 	// SendPrepare is async call, let's wait for 0.1s
