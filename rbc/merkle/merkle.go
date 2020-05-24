@@ -164,15 +164,19 @@ func VerifyProof(proof *pb.MerkleProof, content Content) bool {
 
 	// Verify all the way to root hash.
 	for i, proofPair := range proof.ProofPairs {
+		var parent []byte
 		if i+1 < len(proof.ProofPairs) {
 			parentPair := proof.ProofPairs[i+1]
-			if !verifyHashToParent(proofPair.Primary, proofPair.Secondary, parentPair.Primary) {
-				return false
-			}
+			parent = parentPair.Primary
 		} else {
-			if !verifyHashToParent(proofPair.Primary, proofPair.Secondary, proof.Root) {
-				return false
-			}
+			parent = proof.Root
+		}
+		left, right := proofPair.Primary, proofPair.Secondary
+		if proofPair.IsRightChild {
+			left, right = right, left
+		}
+		if !verifyHashToParent(left, right, parent) {
+			return false
 		}
 	}
 
