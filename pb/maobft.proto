@@ -1,6 +1,7 @@
 // protoc -I pb pb/maobft.proto --go_out=plugins=grpc:pb
 syntax = "proto3";
 
+option go_package = ".;pb";
 package pb;
 
 // A merkle proof is a data structure that proves a content is stored in the Merkle tree.

@@ -13,6 +13,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 )
 
 const leaderPort = 8000
@@ -55,6 +56,7 @@ func startLeader(t *testing.T) (mao rbc.Mao, stopper func()){
 
 	pb.RegisterEchoServer(s, &l)
 	pb.RegisterReadyServer(s, &l)
+	pb.RegisterPrepareServer(s, &l)
 	wg.Add(1)
 	go func(){
 		assert.Nil(t, s.Serve(lis))
@@ -64,21 +66,23 @@ func startLeader(t *testing.T) (mao rbc.Mao, stopper func()){
 }
 
 func TestIntegration(t *testing.T) {
-	//var stoppers []func()
-	//l, s := startLeader(t)
-	//stoppers = append(stoppers, s)
-	//
-	//for i := 1; i < 4; i ++{
-	//	s := startFollower(t, i)
-	//	stoppers = append(stoppers, s)
-	//}
-	//
-	//const testString = "Hello RBC!"
-	//l.RBCSend([]byte(testString))
-	//
-	//time.Sleep(time.Second * 5)
-	//
-	//for _, s := range stoppers{
-	//	s()
-	//}
+	var stoppers []func()
+	l, s := startLeader(t)
+	stoppers = append(stoppers, s)
+
+	for i := 1; i < 4; i ++{
+		s := startFollower(t, i)
+		stoppers = append(stoppers, s)
+	}
+
+	defer func() {
+		for _, s := range stoppers {
+			s()
+		}
+	}()
+
+	const testString = "Hello RBC!"
+	l.RBCSend([]byte(testString))
+
+	time.Sleep(time.Second * 5)
 }
