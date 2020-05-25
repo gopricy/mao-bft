@@ -3,17 +3,16 @@ package common
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"sync"
 
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/erasure"
 	"github.com/gopricy/mao-bft/rbc/merkle"
-	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/peer"
 )
 
 type Received struct {
@@ -21,6 +20,9 @@ type Received struct {
 	rec map[merkle.RootString]map[string]interface{}
 	mu  sync.Mutex
 }
+
+type contextKey string
+const keyName =  contextKey("name")
 
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
@@ -68,12 +70,6 @@ func (p *Peer) GetConn() *grpc.ClientConn {
 
 // Common is a building block of follower and leader
 type Common struct {
-	pb.UnimplementedEchoServer
-	pb.UnimplementedReadyServer
-	pb.UnimplementedPrepareServer
-	EchoClientWrapper
-	ReadyClientWrapper
-
 	RBCSetting
 
 	EchosReceived   Received
@@ -88,8 +84,8 @@ type Common struct {
 	Logger *logging.Logger
 
 	// TODO: remove it from rbc
-	pb.UnimplementedTransactionServiceServer
-	Queue EventQueue
+	//pb.UnimplementedTransactionServiceServer
+	//Queue Event
 }
 
 func NewCommon(name string, setting RBCSetting, app Application) Common{
@@ -132,103 +128,27 @@ func (c *Common) Infof(format string, args ...interface{}){
 	c.Logger.Infof("%s:" + format, append([]interface{}{c.Name()}, args...)...)
 }
 
-// Echo serves echo messages from other nodes
-func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
-	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(req.Data))
-	if !valid {
-		return nil, merkle.InvalidProof{}
-	}
-	// Echo calls
-	p, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, errors.New("Can't get PeerInfo")
-	}
-	c.Debugf(`Get ECHO Message with data "%s"`, req.Data)
-	e, err := c.EchosReceived.Add(p.Addr.String(), req.MerkleProof.Root, req)
-	if err != nil {
-		return nil, err
-	}
-	if e == len(c.RBCSetting.AllPeers)-c.ByzantineLimit {
-		// TODO: interpolate {s'j} from any N-2f leaves received
-		// TODO: recompute Merkle root h' and if h'!=h then abort
-		if !c.readyIsSent(req.MerkleProof.Root) {
-			for _, p := range c.RBCSetting.AllPeers {
-				c.Debugf("%s:")
-				c.SendReady(p, req.MerkleProof.Root)
-			}
-		}
-	}
-	rootString := merkle.MerkleRootToString(req.MerkleProof.Root)
-	// 2f + 1 Ready and N - 2f Echo, decode and apply
-	if e == len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
-		if len(c.ReadiesReceived.rec[rootString]) >= 2*c.ByzantineLimit+1 {
-			data, err := c.reconstructData(rootString)
-			if err != nil {
-				return nil, err
-			}
-			block, err := mao_utils.FromBytesToBlock(data)
-			if err != nil {
-				return nil, err
-			}
-			if err := c.App.RBCReceive(block); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return &pb.EchoResponse{}, nil
+
+
+
+func (c *Common) CreateContext() context.Context{
+	md := metadata.Pairs("name", c.Name())
+	return metadata.NewOutgoingContext(context.Background(), md)
 }
 
-// Ready serves ready messages from other nodes
-func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResponse, error) {
-	p, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, errors.New("Can't get PeerInfo")
+func (c *Common) GetNameFromContext(ctx context.Context) (string, error){
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok{
+		return "", errors.New("failed to decode context")
+	}
+	name, ok := md["name"]
+	if !ok{
+		return "", errors.New("context doesn't have name")
 	}
 
-	// TODO: after getting f+1 READY: Send Ready if not Sent
-	r, err := c.ReadiesReceived.Add(p.Addr.String(), req.MerkleRoot, struct{}{})
-	if err != nil {
-		return nil, err
-	}
-
-	if r == c.ByzantineLimit+1 {
-		if !c.readyIsSent(req.MerkleRoot) {
-			for _, p := range c.RBCSetting.AllPeers {
-				// TODO: PERFORMANCE probably need an unblocking call for performance
-				c.SendReady(p, req.MerkleRoot)
-			}
-		}
-	}
-
-	merkleRoot := merkle.MerkleRootToString(req.MerkleRoot)
-	if r == 2*c.ByzantineLimit+1 {
-		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
-			data, err := c.reconstructData(merkleRoot)
-			if err != nil {
-				return nil, err
-			}
-			block, err := mao_utils.FromBytesToBlock(data)
-			if err != nil {
-				return nil, err
-			}
-			if err := c.App.RBCReceive(block); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return &pb.ReadyResponse{}, nil
+	return name[0], nil
 }
 
-// Prepare serves Prepare messages sent from Leader
-func (c *Common) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareResponse, error) {
-	c.Debugf(`Get PREPARE: data "%s" in payload`, req.Data)
-	for _, p := range c.AllPeers {
-		c.Debugf(`Send ECHO with data "%s" to: %#v`, req.Data, p)
-		c.SendEcho(p, req.MerkleProof, req.Data)
-	}
-	return &pb.PrepareResponse{}, nil
-}
 
 func (c *Common) ProposeTransaction(
 	ctx context.Context, in *pb.ProposeTransactionRequest) (*pb.ProposeTransactionResponse, error) {

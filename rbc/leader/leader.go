@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/erasure"
 	"github.com/gopricy/mao-bft/rbc/merkle"
@@ -9,7 +10,6 @@ import (
 type Leader struct {
 	name string
 	common.Common
-	common.PrepareClientWrapper
 }
 
 func NewLeader(name string, app common.Application, faultLimit int, peers []*common.Peer) Leader {
@@ -39,5 +39,27 @@ func (l *Leader) RBCSend(data []byte) {
 			panic(err)
 		}
 		l.SendPrepare(p, proof, splits[i])
+	}
+}
+
+
+func (l *Leader) SendPrepare(p *common.Peer, merkleProof *pb.MerkleProof, data []byte) {
+	payload := &pb.Payload{
+		MerkleProof: merkleProof,
+		Data:        data,
+	}
+	/*
+		go func() {
+			for {
+				_, err := pb.NewPrepareClient(p.GetConn()).Prepare(context.Background(), payload)
+				if err == nil {
+					break
+				}
+			}
+		}()
+	*/
+	_, err := pb.NewPrepareClient(p.GetConn()).Prepare(l.CreateContext(), payload)
+	if err != nil {
+		panic(err)
 	}
 }
