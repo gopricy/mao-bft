@@ -44,8 +44,6 @@ message BlockContent {
   repeated Transaction txs = 1;
   // Hash of previous block, nil if block is head.
   bytes prev_hash = 2;
-  // TODO(chenweilunster): DELETE THIS FIELD
-  int32 seq_number = 3;
 }
 
 message SimpleKeyValueStoreMessage {
