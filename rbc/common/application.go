@@ -8,7 +8,8 @@ import (
 type Application interface {
 	// Once a message is RBC'ed, this function will be called to apply this block.
 	// This function should be thread safe.
-	RBCReceive(block pb.Block) error
+	// TODO: can change it to block *pb.Block when we finalize it
+	RBCReceive([]byte) error
 	// Get status of a transaction by its uuid.
 	GetTransactionStatus(txUuid string) (pb.TransactionStatus, error)
 	// TODO(chenweilunster): Add validation functionality

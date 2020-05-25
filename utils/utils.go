@@ -19,9 +19,9 @@ func IsSameBytes(left []byte, right []byte) bool {
 }
 
 func FromBytesToBlock(bytes []byte) (*pb.Block, error) {
-	var block pb.Block
-	err := proto.Unmarshal(bytes, &block)
-	return &block, err
+	block := new(pb.Block)
+	err := proto.Unmarshal(bytes, block)
+	return block, err
 }
 
 // Create a block from:

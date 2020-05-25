@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
-	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
 )
 
@@ -43,9 +42,9 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	if r == c.ByzantineLimit+1 {
 		if !c.readyIsSent(req.MerkleRoot) {
 			for _, p := range c.RBCSetting.AllPeers {
-				c.Debugf("Send Ready to %#v", p)
+				c.Debugf("Send READY (in Ready) to %#v", p)
 				// TODO: Don't understand why this SendReady always fail in GRPC
-				//c.SendReady(p, req.MerkleRoot)
+				c.SendReady(p, req.MerkleRoot)
 			}
 		}
 	}
@@ -53,19 +52,22 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	merkleRoot := merkle.MerkleRootToString(req.MerkleRoot)
 	if r == 2*c.ByzantineLimit+1 {
 		if len(c.EchosReceived.rec[merkleRoot]) >= len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
+			c.Infof("Get enough READY and ECHO to decode")
 			data, err := c.reconstructData(merkleRoot)
 			if err != nil {
 				return nil, err
 			}
-			block, err := mao_utils.FromBytesToBlock(data)
-			if err != nil {
-				return nil, err
-			}
+			c.Infof("Data reconstructed %s", data)
+			// TODO: add it back when block and app is finished
+			//block, err := mao_utils.FromBytesToBlock(data)
+			//if err != nil {
+			//	return nil, err
+			//}
 
 			c.Infof("RBC Receive with data %s", data)
-			if err := c.App.RBCReceive(block); err != nil {
-				return nil, err
-			}
+			//if err := c.App.RBCReceive(block); err != nil {
+			//	return nil, err
+			//}
 		}
 	}
 

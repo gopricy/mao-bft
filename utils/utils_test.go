@@ -34,8 +34,8 @@ func TestFromBytesToBlock(t *testing.T) {
 	}
 	bytes, err := proto.Marshal(&block)
 	assert.Nil(t, err)
-	reBlock, reErr := FromBytesToBlock(bytes)
-	assert.Nil(t, reErr)
+	reBlock, err := FromBytesToBlock(bytes)
+	assert.Nil(t, err)
 	assert.True(t, IsSameBytes(reBlock.CurHash, block.CurHash))
 	assert.Equal(t, reBlock.Content.Txs[0].TransactionUuid, "abc")
 }

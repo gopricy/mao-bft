@@ -21,6 +21,7 @@ var _ Common = &common.Common{}
 
 type Mao interface {
 	SendPrepare(*common.Peer, *pb.MerkleProof, []byte)
+	// TODO: we can change it to block
 	RBCSend([]byte)
 	Common
 }

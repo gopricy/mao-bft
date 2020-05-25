@@ -48,13 +48,14 @@ type RBCSetting struct {
 }
 
 type Peer struct {
+	Name string
 	IP   string
 	PORT int
 	CONN *grpc.ClientConn
 }
 
 func (p *Peer) GoString() string{
-	return fmt.Sprintf("%d", p.PORT)
+	return fmt.Sprintf("%s", p.Name)
 }
 
 func (p *Peer) GetConn() *grpc.ClientConn {
@@ -96,7 +97,7 @@ func NewCommon(name string, setting RBCSetting, app Application) Common{
 	return Common{RBCSetting: setting,
 		NodeName: name,
 		App: app,
-		Logger: logging.MustGetLogger(name),
+		Logger: logging.MustGetLogger("RBC"),
 	}
 }
 

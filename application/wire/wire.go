@@ -13,7 +13,7 @@ import (
 type Application interface {
 	// Once a message is RBC'ed, this function will be called to apply this block.
 	// This function should be thread safe.
-	RBCReceive(block pb.Block) error
+	RBCReceive(bytes []byte) error
 	// Get status of a transaction by its uuid.
 	GetTransactionStatus(txUuid string) (pb.TransactionStatus, error)
 	// TODO(chenweilunster): Add validation functionality
@@ -80,11 +80,13 @@ type WireSystem struct {
 	Acnt Accounts
 }
 
+var _ Application = &WireSystem{}
+
 func (ws *WireSystem) Init() {
 	ws.Blockchain.Init()
 }
 
-func (ws *WireSystem) RBCReceive(block pb.Block) error {
+func (ws *WireSystem) RBCReceive(bytes []byte) error {
 	// TODO(chenweilunster): IMPLEMENT ME
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
-	maoUtils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
 )
 
@@ -30,7 +29,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 		// TODO: recompute Merkle root h' and if h'!=h then abort
 		if !c.readyIsSent(req.MerkleProof.Root) {
 			for _, p := range c.RBCSetting.AllPeers {
-				c.Debugf("Send Ready to %#v", p)
+				c.Debugf("Send READY to %#v", p)
 				c.SendReady(p, req.MerkleProof.Root)
 			}
 		}
@@ -39,17 +38,20 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	// 2f + 1 Ready and N - 2f Echo, decode and apply
 	if e == len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
 		if len(c.ReadiesReceived.rec[rootString]) >= 2*c.ByzantineLimit+1 {
+			c.Infof("Get enough READY and ECHO to decode")
 			data, err := c.reconstructData(rootString)
 			if err != nil {
 				return nil, err
 			}
-			block, err := maoUtils.FromBytesToBlock(data)
-			if err != nil {
-				return nil, err
-			}
-			if err := c.App.RBCReceive(block); err != nil {
-				return nil, err
-			}
+			// TODO: add it back when block and app is ready
+			//block, err := maoUtils.FromBytesToBlock(data)
+			//if err != nil {
+			//	return nil, err
+			//}
+			c.Infof("Data reconstructed %s", data)
+			//if err := c.App.RBCReceive(block); err != nil {
+			//	return nil, err
+			//}
 		}
 	}
 	return &pb.EchoResponse{}, nil

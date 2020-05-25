@@ -17,8 +17,12 @@ func NewLeader(name string, app common.Application, faultLimit int, peers []*com
 	return Leader{Common: common.NewCommon(name, setting, app)}
 }
 
-func (l *Leader) RBCSend(data []byte) {
-	splits, err := erasure.Split(data, l.ByzantineLimit, len(l.AllPeers))
+func (l *Leader) RBCSend(bytes[]byte) {
+	//bytes, err := proto.Marshal(block)
+	//if err != nil{
+	//	panic(err)
+	//}
+	splits, err := erasure.Split(bytes, l.ByzantineLimit, len(l.AllPeers))
 	if err != nil {
 		panic(err)
 	}
