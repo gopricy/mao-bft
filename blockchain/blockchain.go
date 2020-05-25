@@ -2,173 +2,139 @@ package blockchain
 
 import (
 	"container/list"
-	sha256 "crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/gopricy/mao-bft/pb"
 	mao_utils "github.com/gopricy/mao-bft/utils"
-	"github.com/golang/protobuf/proto"
 )
-
-type StagedBlock struct {
-	Prev  *StagedBlock
-	Next  *StagedBlock
-	Value *pb.Block
-}
-
-// RemoveStagedBlock removes a staged block from blockchain. Return prev block.
-func RemoveStagedBlock(Block *StagedBlock) *StagedBlock {
-	prevBlock := Block.Prev
-	if Block.Next != nil {
-		Block.Next.Prev = Block.Prev
-	}
-	Block.Prev.Next = Block.Next
-	return prevBlock
-}
-
-// Insert to list in sorted order.
-func OrderedInsertToList(head *StagedBlock, Block pb.Block) bool {
-	cur := head
-	for cur.Next != nil && cur.Next.Value.Content.SeqNumber < Block.Content.SeqNumber {
-		cur = cur.Next
-	}
-	// Insert after cur node.
-	newBlock := StagedBlock{
-		Prev:  cur,
-		Next:  cur.Next,
-		Value: &Block,
-	}
-	if cur.Next != nil {
-		cur.Next.Prev = &newBlock
-	}
-	cur.Next = &newBlock
-	return true
-}
-
-func GetStagedAreaSize(head StagedBlock) int {
-	cur := head.Next
-	count := 0
-	for cur != nil {
-		count += 1
-		cur = cur.Next
-	}
-	return count
-}
-
-func GetLastBlockInStagedArea(head StagedBlock) (StagedBlock, error) {
-	if head.Next == nil {
-		return StagedBlock{}, errors.New("Not staged block in staged area.")
-	}
-	cur := head.Next
-	for cur.Next != nil {
-		cur = cur.Next
-	}
-	return *cur, nil
-}
 
 type Blockchain struct {
 	// This structure stores the blocks in chain.
 	Chain []*pb.Block
 	// This list stores sorted blocks that are not committed. All blocks are sorted by sequence number.
-	Staged StagedBlock
+	Staged map[string]*pb.Block
 	// This list stores pending blocks that is/will be broadcast. This should be concatenated to Chain.
-	Pending list.List
+	Pending *list.List
+	// A mapping from transaction status to its status.
+	TxStatus map[string]pb.TransactionStatus
 	// Access to blockchain should always be thread-safe.
 	Mu sync.RWMutex
 }
 
+// Init internal data structure.
 func (bc *Blockchain) Init() {
-	// Add a sentinel node for both staged and blockchain.
-	bc.Chain = append(bc.Chain, &pb.Block{})
-	bc.Staged = StagedBlock{}
-	bc.Pending = *list.New()
+	bc.Pending = list.New()
+	// The first block in blockchain should have hash of 0.
+	bc.Chain = append(bc.Chain, &pb.Block{CurHash: []byte{0}})
 }
 
-func (bc *Blockchain) GetLastBlock() *pb.Block {
-	return bc.Chain[len(bc.Chain)-1]
-}
-
-func (bc *Blockchain) GetLastIndex() int {
-	return len(bc.Chain) - 1
-}
-
-// Add to staged area in sorted order.
-func (bc *Blockchain) addToStagedArea(Block pb.Block) bool {
-	return OrderedInsertToList(&bc.Staged, Block)
-}
-
-// ValidateBlock validates that a block's cur_hash matches the actual hash.
-func ValidateBlock(Block pb.Block) bool {
-	h := sha256.New()
-	byteContent, _ := proto.Marshal(Block.Content)
-	if _, err := h.Write(byteContent); err != nil {
-		return false
+// Add block to staged area, key to it's previous block's CurHash.
+func (bc *Blockchain) addToStagedArea(block pb.Block) error {
+	hexHash := hex.EncodeToString(block.Content.PrevHash)
+	if exist, ok := bc.Staged[hexHash]; ok {
+		if !mao_utils.IsSameBytes(exist.CurHash, block.CurHash) {
+			fmt.Println()
+		}
 	}
-	return mao_utils.IsSameBytes(h.Sum(nil), Block.CurHash)
+	bc.Staged[hexHash] = &block
+	if err := bc.setTxsStatus(block.Content.Txs, pb.TransactionStatus_STAGED, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Returns whether a blockchain has uncommitted (by ready to commit) blocks in staged area.
+func (bc *Blockchain) dirty() (bool, *pb.Block) {
+	lastCommit := mao_utils.GetLastBlockFromArray(bc.Chain)
+	lastCommitHash := hex.EncodeToString(lastCommit.CurHash)
+	if staged, ok := bc.Staged[lastCommitHash]; ok {
+		return true, staged
+	}
+	return false, nil
+}
+
+// Set a list of transactions as status.
+func (bc *Blockchain) setTxsStatus(txs []*pb.Transaction, status pb.TransactionStatus, overwrite bool) error {
+	for _, tx := range txs {
+		_, ok := bc.TxStatus[tx.TransactionUuid]
+		// Either overwrite an existing value, or write for the first time.
+		if ok != overwrite {
+			return errors.New("Transaction status doesn't match overwrite specification" + strconv.FormatBool(overwrite))
+		}
+		bc.TxStatus[tx.TransactionUuid] = status
+	}
+	return nil
 }
 
 // CommitBlock tries to apply a single block to block chain, return all blocks get applied, removed,
 // and whether the input block is committed.
-// Note that, there could be multiple block gets applied in one shot.
-// TODO(chenweilunster): handle pending block case.
-func (bc *Blockchain) CommitBlock(Block pb.Block) ([]*pb.Block, []*pb.Block, bool, error) {
+// - input
+// Block: The block that we're trying to commit.
+// - output
+// 1. Successfully committed new blocks. Empty if nothing gets committed.
+// 2. Error
+func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
 	// 0. Validate block.
-	if isValid := ValidateBlock(Block); isValid == false {
-		return nil, nil, false, errors.New("The block is not valid.")
+	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
+		return nil, errors.New("The block is invalid.")
 	}
-	// 1. Add the block to staged area in order.
-	bc.addToStagedArea(Block)
+	// 1. Add the block to staged area in order by sequence number.
+	if err := bc.addToStagedArea(block); err != nil {
+		return nil, nil
+	}
 
 	var committed []*pb.Block
-	var deleted []*pb.Block
-	isApplied := false
-	// 2. try commit to chain if it matches the last block.
-	if mao_utils.IsSameBytes(Block.Content.PrevHash, bc.GetLastBlock().CurHash) {
-		isApplied = true
-		// Scan staging area and 1. Remove all invalid. 2. commit all can be connected.
-		cur := bc.Staged.Next
-		for cur != nil && cur.Next != nil {
-			if cur.Value.Content.SeqNumber > int32(bc.GetLastIndex()+1) {
-				break
-			}
-
-			if cur.Value.Content.SeqNumber <= int32(bc.GetLastIndex()) {
-				// The staged area conflict with chain, thus remove.
-				deleted = append(deleted, cur.Value)
-				cur = RemoveStagedBlock(cur)
-			} else if cur.Value.Content.SeqNumber == int32(bc.GetLastIndex()+1) {
-				// Try to commit if hash matches.
-				if mao_utils.IsSameBytes(cur.Value.Content.PrevHash, bc.GetLastBlock().CurHash) {
-					committed = append(committed, cur.Value)
-					bc.Chain = append(bc.Chain, cur.Value)
-				}
-				cur = RemoveStagedBlock(cur)
-			}
-			cur = cur.Next
+	// 2. Scan staged area, try to commit if it's dirty.
+	for isDirty, candidate := bc.dirty(); isDirty; isDirty, candidate = bc.dirty() {
+		// a. Append to Chain.
+		bc.Chain = append(bc.Chain, candidate)
+		committed = append(committed, candidate)
+		if err := bc.setTxsStatus(block.Content.Txs, pb.TransactionStatus_COMMITTED, true); err != nil {
+			return nil, err
 		}
+
+		// b. Remove from pending.
+		iter := bc.Pending.Front()
+		nextPending := iter.Value.(*pb.Block)
+		if !mao_utils.IsSameBlock(nextPending, candidate) {
+			return nil, errors.New("Candidate block must be the head of pending.")
+		}
+		bc.Pending.Remove(iter)
+
+		// c. Remove from staged.
+		delete(bc.Staged, hex.EncodeToString(candidate.Content.PrevHash))
 	}
-	return committed, deleted, isApplied, nil
+
+	return committed, nil
 }
 
 // CreateNewPendingBlock creates a block at pending chain. Append the block to pending chain and returns.
-func (bc *Blockchain) CreateNewPendingBlock(txs []pb.Transaction) (pb.Block, error) {
-	bc.Mu.Lock()
-	defer bc.Mu.Unlock()
-	var lastBlock *pb.Block
-	lastBlock = bc.Chain[len(bc.Chain)-1]
+func (bc *Blockchain) CreateNewPendingBlock(txs []*pb.Transaction) (pb.Block, error) {
+	lastBlock := mao_utils.GetLastBlockFromArray(bc.Chain)
 	if bc.Pending.Len() != 0 {
 		lastBlock = bc.Pending.Back().Value.(*pb.Block)
 	}
-	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash, int(lastBlock.Content.SeqNumber)+1)
+	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		txs, lastBlock.CurHash, int(lastBlock.Content.SeqNumber) + 1)
 	if err != nil {
 		return pb.Block{}, err
 	}
 	bc.Pending.PushBack(newBlock)
+	// Assign all TX as status PENDING.
+	if err := bc.setTxsStatus(txs, pb.TransactionStatus_PENDING, false); err != nil {
+		return pb.Block{}, err
+	}
 	return newBlock, nil
 }
 
-func (bc *Blockchain) GetTransactionStatus(txUuid string) (pb.TransactionStatus, error) {
-	// TODO(chenweilunster): IMPLEMENT ME
-	return pb.TransactionStatus_UNKNOWN, nil
+// Returns the status of a transaction, REJECT if the transaction is not found in chain.
+func (bc *Blockchain) GetTransactionStatus(txUuid string) pb.TransactionStatus {
+	if status, ok := bc.TxStatus[txUuid]; ok {
+		return status
+	}
+	return pb.TransactionStatus_REJECTED
 }

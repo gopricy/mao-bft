@@ -43,7 +43,7 @@ message BlockContent {
   repeated Transaction txs = 1;
   // Hash of previous block, nil if block is head.
   bytes prev_hash = 2;
-  // Location of this block on blockchain.
+  // TODO(chenweilunster): DELETE THIS FIELD
   int32 seq_number = 3;
 }
 
