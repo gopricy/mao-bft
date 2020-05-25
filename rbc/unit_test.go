@@ -48,12 +48,14 @@ func TestEcho(t *testing.T) {
 	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil)}
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	assert.Nil(t, err)
+	defer lis.Close()
 	s := grpc.NewServer()
 
 	pb.RegisterEchoServer(s, &server)
 	pb.RegisterReadyServer(s, &server)
 	pb.RegisterPrepareServer(s, &server)
 	go s.Serve(lis)
+	defer s.Stop()
 
 	peer := &common.Peer{IP: "127.0.0.1", PORT: 8000}
 
@@ -69,5 +71,4 @@ func TestEcho(t *testing.T) {
 	assert.Equal(t, 1, len(server.savedEcho))
 	assert.Equal(t, []byte("root"), server.savedEcho[0].MerkleProof.Root)
 	assert.Equal(t, []byte("echo"), server.savedEcho[0].Data)
-	s.GracefulStop()
 }
