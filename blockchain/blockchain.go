@@ -83,10 +83,16 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
 	bc.Mu.Lock()
 	defer bc.Mu.Unlock()
 
-	// 0. Validate block.
+	// 0. Validate block:
+	// a. Block should have valid hash.
 	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
 		return nil, errors.New("The block is invalid.")
 	}
+	// b. Skip block if already in staged
+	if _, ok := bc.Staged[hex.EncodeToString(block.Content.PrevHash)]; ok {
+		return nil, nil
+	}
+
 	// 1. Add the block to staged area in order by sequence number.
 	isLeader := bc.Pending.Len() != 0
 	if err := bc.addToStagedArea(block, isLeader); err != nil {

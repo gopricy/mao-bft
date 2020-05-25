@@ -117,3 +117,88 @@ func TestBlockchain_CommitBlock_Commit2Block(t *testing.T) {
 		assert.Equal(t, bc.TxStatus[key], pb.TransactionStatus_COMMITTED)
 	}
 }
+
+func TestBlockchain_CommitBlock_StageOnly(t *testing.T) {
+	bc := getSampleBlockchain()
+	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructWireTransaction("5", 10, "user2", "user1"),
+		},
+		[]byte{1})
+	assert.Nil(t, err)
+	blocks, err := bc.CommitBlock(block)
+	assert.Nil(t, err)
+	assert.Equal(t, len(blocks), 0)
+	assert.Equal(t, len(bc.Staged), 2)
+}
+
+func TestBlockchain_CommitBlock_IdempotentCommit(t *testing.T) {
+	bc := getSampleBlockchain()
+	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructWireTransaction("5", 10, "user2", "user1"),
+		},
+		[]byte{1})
+	assert.Nil(t, err)
+	blocks, err := bc.CommitBlock(block)
+	assert.Nil(t, err)
+	assert.Equal(t, len(blocks), 0)
+	assert.Equal(t, len(bc.Staged), 2)
+
+	// Commit again.
+	blocks, err = bc.CommitBlock(block)
+	assert.Nil(t, err)
+	assert.Equal(t, len(blocks), 0)
+	assert.Equal(t, len(bc.Staged), 2)
+}
+
+func TestBlockchain_CreateNewPendingBlock(t *testing.T) {
+	bc := getSampleBlockchain()
+	block, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructWireTransaction("5", 1, "user1", "user2"),
+		constructWireTransaction("6", 1, "user1", "user2"),
+	})
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsValidBlockHash(block))
+	assert.Equal(t, bc.Pending.Len(), 3)
+	assert.Equal(t, len(bc.Staged), 1)
+	assert.Equal(t, len(bc.Chain), 2)
+	assert.Equal(t, bc.TxStatus["5"], pb.TransactionStatus_PENDING)
+	assert.Equal(t, bc.TxStatus["6"], pb.TransactionStatus_PENDING)
+}
+
+// Do some fancy operation and test status.
+func TestBlockchain_GetTransactionStatus(t *testing.T) {
+	bc := Blockchain{}
+	bc.Init()
+	// Get non-exist.
+	assert.Equal(t, bc.GetTransactionStatus("3"), pb.TransactionStatus_REJECTED)
+
+	pending1, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("1", 10, "user1")})
+	assert.Nil(t, err)
+	assert.Equal(t, len(bc.TxStatus), 1)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_PENDING)
+
+	pending2, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("2", 10, "user2")})
+	assert.Nil(t, err)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_PENDING)
+
+	// Commit 2, this should make pending 2 to staged.
+	committed, err := bc.CommitBlock(pending2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(committed), 0)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_STAGED)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_PENDING)
+
+	// Commit 1, this should make everything committed.
+	committed, err = bc.CommitBlock(pending1)
+	assert.Nil(t, err)
+	assert.Equal(t, len(committed), 2)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_COMMITTED)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_COMMITTED)
+}
