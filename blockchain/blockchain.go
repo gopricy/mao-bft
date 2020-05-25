@@ -5,12 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
-	"sync"
-
-	"github.com/golang/protobuf/proto"
 	"github.com/gopricy/mao-bft/pb"
 	mao_utils "github.com/gopricy/mao-bft/utils"
+	"strconv"
+	"sync"
 )
 
 type Blockchain struct {
