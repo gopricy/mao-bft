@@ -28,12 +28,8 @@ func FromBytesToBlock(bytes []byte) (pb.Block, error) {
 // 1. A list of transactions
 // 2. Previous Hash
 func CreateBlockFromTxsAndPrevHash(txs []*pb.Transaction, prevHash []byte) (pb.Block, error) {
-	block := pb.Block{}
-	block.Content.PrevHash = prevHash
-	for _, tx := range txs {
-		block.Content.Txs = append(block.Content.Txs, tx)
-	}
-	bytes, err := proto.Marshal(&block)
+	block := pb.Block{Content: &pb.BlockContent{Txs: txs, PrevHash: prevHash}}
+	bytes, err := proto.Marshal(block.Content)
 	if err != nil {
 		return pb.Block{}, err
 	}
@@ -59,7 +55,7 @@ func GetLastBlockFromArray(blocks []*pb.Block) *pb.Block {
 }
 
 func IsSameBlock(left *pb.Block, right *pb.Block) bool {
-	if !IsSameBytes(left.CurHash, right.CurHash) || IsValidBlockHash(*left) || IsValidBlockHash(*right) {
+	if !IsSameBytes(left.CurHash, right.CurHash) || !IsValidBlockHash(*left) || !IsValidBlockHash(*right) {
 		return false
 	}
 	return true
