@@ -27,11 +27,9 @@ func FromBytesToBlock(bytes []byte) (pb.Block, error) {
 // Create a block from:
 // 1. A list of transactions
 // 2. Previous Hash
-// 3. Sequence number
-func CreateBlockFromTxsAndPrevHash(txs []*pb.Transaction, prevHash []byte, seq int) (pb.Block, error) {
+func CreateBlockFromTxsAndPrevHash(txs []*pb.Transaction, prevHash []byte) (pb.Block, error) {
 	block := pb.Block{}
 	block.Content.PrevHash = prevHash
-	block.Content.SeqNumber = int32(seq)
 	for _, tx := range txs {
 		block.Content.Txs = append(block.Content.Txs, tx)
 	}

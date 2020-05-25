@@ -76,7 +76,11 @@ func (bc *Blockchain) setTxsStatus(txs []*pb.Transaction, status pb.TransactionS
 // - output
 // 1. Successfully committed new blocks. Empty if nothing gets committed.
 // 2. Error
+// This function is thread safe.
 func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
+	bc.Mu.Lock()
+	defer bc.Mu.Unlock()
+
 	// 0. Validate block.
 	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
 		return nil, errors.New("The block is invalid.")
@@ -112,13 +116,16 @@ func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
 }
 
 // CreateNewPendingBlock creates a block at pending chain. Append the block to pending chain and returns.
+// This function is thread safe.
 func (bc *Blockchain) CreateNewPendingBlock(txs []*pb.Transaction) (pb.Block, error) {
+	bc.Mu.Lock()
+	defer bc.Mu.Unlock()
+
 	lastBlock := mao_utils.GetLastBlockFromArray(bc.Chain)
 	if bc.Pending.Len() != 0 {
 		lastBlock = bc.Pending.Back().Value.(*pb.Block)
 	}
-	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(
-		txs, lastBlock.CurHash, int(lastBlock.Content.SeqNumber) + 1)
+	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash)
 	if err != nil {
 		return pb.Block{}, err
 	}

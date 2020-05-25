@@ -14,7 +14,7 @@ func TestIsSameBytes(t *testing.T) {
 
 func TestFromBytesToBlock(t *testing.T) {
 	block := pb.Block{
-		Content: &pb.BlockContent{SeqNumber: 1},
+		Content: &pb.BlockContent{Txs: []*pb.Transaction{{TransactionUuid: "abc"}}},
 		CurHash: []byte{1, 2},
 	}
 	bytes, err := proto.Marshal(&block)
@@ -22,5 +22,5 @@ func TestFromBytesToBlock(t *testing.T) {
 	reBlock, reErr := FromBytesToBlock(bytes)
 	assert.Nil(t, reErr)
 	assert.True(t, IsSameBytes(reBlock.CurHash, block.CurHash))
-	assert.Equal(t, reBlock.Content.SeqNumber, block.Content.SeqNumber)
+	assert.Equal(t, reBlock.Content.Txs[0].TransactionUuid, "abc")
 }
