@@ -1,6 +1,119 @@
 package blockchain
 
-// Create a sample blockchain that contains a single block in each of staged/commited/pending area.
+import (
+	"encoding/hex"
+	"github.com/gopricy/mao-bft/pb"
+	mao_utils "github.com/gopricy/mao-bft/utils"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func constructDepositTransaction(txUuid string, amount int, userId string) *pb.Transaction {
+	return &pb.Transaction{
+		TransactionUuid: txUuid,
+		Message: &pb.Transaction_DepositMsg{
+			DepositMsg: &pb.DepositMessage{
+				Amount: int32(amount),
+				AccountId: userId,
+			},
+		},
+	}
+}
+
+func constructWireTransaction(txUuid string, amount int, from string, to string) *pb.Transaction {
+	return &pb.Transaction{
+		TransactionUuid: txUuid,
+		Message: &pb.Transaction_WireMsg{
+			WireMsg: &pb.WireMessage{
+				Amount: int32(amount),
+				FromId: from,
+				ToId: to,
+			},
+		},
+	}
+}
+
+// Create a sample blockchain that contains a single block in each of staged/committed/pending area.
 func getSampleBlockchain() *Blockchain {
-	return &Blockchain{}
+	bc := Blockchain{}
+	bc.Init()
+	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructDepositTransaction("1", 10, "user1"),
+			constructDepositTransaction("2", 15, "user2"),
+		},
+		mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
+	if err != nil {
+		panic("Fail to construct block.")
+	}
+	bc.Chain = append(bc.Chain, block)
+
+	// Create 2 pending block.
+	pending1, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructWireTransaction("3", 10, "user2", "user1"),
+		},
+		mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
+	pending2, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructWireTransaction("4", 5, "user1", "user2"),
+		},
+		pending1.CurHash)
+	bc.Pending.PushBack(pending1)
+	bc.Pending.PushBack(pending2)
+	// Set Pending 2 as staged block.
+	bc.Staged[hex.EncodeToString(pending2.Content.PrevHash)] = pending2
+
+	// Setup tx status.
+	bc.TxStatus["1"] = pb.TransactionStatus_COMMITTED
+	bc.TxStatus["2"] = pb.TransactionStatus_COMMITTED
+	bc.TxStatus["3"] = pb.TransactionStatus_PENDING
+	bc.TxStatus["4"] = pb.TransactionStatus_STAGED
+
+	return &bc
+}
+
+func TestBlockchain_Init(t *testing.T) {
+	bc := Blockchain{}
+	bc.Init()
+	assert.NotNil(t, bc.Pending)
+	assert.Equal(t, len(bc.Chain), 1)
+	assert.True(t, mao_utils.IsSameBytes(bc.Chain[0].CurHash, []byte{0}))
+	assert.NotNil(t, bc.Staged)
+	assert.NotNil(t, bc.TxStatus)
+}
+
+func TestBlockchain_CommitBlock_CommitSingleBlock(t *testing.T) {
+	bc := Blockchain{}
+	bc.Init()
+	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
+		[]*pb.Transaction{
+			constructWireTransaction("3", 10, "user2", "user1"),
+		},
+		mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
+	assert.Nil(t, err)
+	committedBlocks, err := bc.CommitBlock(block)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(committedBlocks))
+	assert.Equal(t, bc.Pending.Len(), 0)
+	assert.Equal(t, len(bc.Staged), 0)
+	assert.Equal(t, len(bc.Chain), 2)
+	assert.Equal(t, bc.Chain[1].Content.Txs[0].TransactionUuid, "3")
+	assert.Equal(t, len(bc.TxStatus), 1)
+	assert.Equal(t, bc.TxStatus["3"], pb.TransactionStatus_COMMITTED)
+}
+
+func TestBlockchain_CommitBlock_Commit2Block(t *testing.T) {
+	bc := getSampleBlockchain()
+	candidate := bc.Pending.Front().Value.(*pb.Block)
+	committed, err := bc.CommitBlock(candidate)
+	assert.Nil(t, err)
+	assert.Equal(t, len(committed), 2)
+	assert.Equal(t, committed[0].Content.Txs[0].TransactionUuid, "3")
+	assert.Equal(t, committed[1].Content.Txs[0].TransactionUuid, "4")
+	// Test status
+	assert.Equal(t, len(bc.TxStatus), 4)
+	for _, key := range []string{"1", "2", "3", "4"} {
+		assert.Equal(t, bc.TxStatus[key], pb.TransactionStatus_COMMITTED)
+	}
 }

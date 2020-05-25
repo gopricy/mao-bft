@@ -29,18 +29,20 @@ func (bc *Blockchain) Init() {
 	bc.Pending = list.New()
 	// The first block in blockchain should have hash of 0.
 	bc.Chain = append(bc.Chain, &pb.Block{CurHash: []byte{0}})
+	bc.TxStatus = make(map[string]pb.TransactionStatus)
+	bc.Staged = make(map[string]*pb.Block)
 }
 
 // Add block to staged area, key to it's previous block's CurHash.
-func (bc *Blockchain) addToStagedArea(block pb.Block) error {
+func (bc *Blockchain) addToStagedArea(block *pb.Block, overwrite bool) error {
 	hexHash := hex.EncodeToString(block.Content.PrevHash)
 	if exist, ok := bc.Staged[hexHash]; ok {
 		if !mao_utils.IsSameBytes(exist.CurHash, block.CurHash) {
 			fmt.Println()
 		}
 	}
-	bc.Staged[hexHash] = &block
-	if err := bc.setTxsStatus(block.Content.Txs, pb.TransactionStatus_STAGED, true); err != nil {
+	bc.Staged[hexHash] = block
+	if err := bc.setTxsStatus(block.Content.Txs, pb.TransactionStatus_STAGED, overwrite); err != nil {
 		return err
 	}
 	return nil
@@ -77,16 +79,17 @@ func (bc *Blockchain) setTxsStatus(txs []*pb.Transaction, status pb.TransactionS
 // 1. Successfully committed new blocks. Empty if nothing gets committed.
 // 2. Error
 // This function is thread safe.
-func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
+func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
 	bc.Mu.Lock()
 	defer bc.Mu.Unlock()
 
 	// 0. Validate block.
-	if isValid := mao_utils.IsValidBlockHash(&block); isValid == false {
+	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
 		return nil, errors.New("The block is invalid.")
 	}
 	// 1. Add the block to staged area in order by sequence number.
-	if err := bc.addToStagedArea(block); err != nil {
+	isLeader := bc.Pending.Len() != 0
+	if err := bc.addToStagedArea(block, isLeader); err != nil {
 		return nil, nil
 	}
 
@@ -96,17 +99,19 @@ func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
 		// a. Append to Chain.
 		bc.Chain = append(bc.Chain, candidate)
 		committed = append(committed, candidate)
-		if err := bc.setTxsStatus(block.Content.Txs, pb.TransactionStatus_COMMITTED, true); err != nil {
+		if err := bc.setTxsStatus(candidate.Content.Txs, pb.TransactionStatus_COMMITTED, true); err != nil {
 			return nil, err
 		}
 
-		// b. Remove from pending.
-		iter := bc.Pending.Front()
-		nextPending := iter.Value.(*pb.Block)
-		if !mao_utils.IsSameBlock(nextPending, candidate) {
-			return nil, errors.New("Candidate block must be the head of pending.")
+		// b. Remove from pending if it has. Note that, only leader contains pending section.
+		if bc.Pending.Len() != 0 {
+			iter := bc.Pending.Front()
+			nextPending := iter.Value.(*pb.Block)
+			if !mao_utils.IsSameBlock(nextPending, candidate) {
+				return nil, errors.New("Candidate block must be the head of pending.")
+			}
+			bc.Pending.Remove(iter)
 		}
-		bc.Pending.Remove(iter)
 
 		// c. Remove from staged.
 		delete(bc.Staged, hex.EncodeToString(candidate.Content.PrevHash))
