@@ -47,7 +47,7 @@ func TestFromBytesToBlock_ReconstructIsStillValid(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, IsValidBlockHash(block))
 
-	bytes, err := proto.Marshal(&block)
+	bytes, err := proto.Marshal(block)
 	assert.Nil(t, err)
 	reBlock, reErr := FromBytesToBlock(bytes)
 	assert.Nil(t, reErr)
@@ -77,9 +77,9 @@ func TestIsValidBlockHash(t *testing.T) {
 	hash, err := hashProtoMessage(&expectedContent)
 	assert.Nil(t, err)
 	block := pb.Block{Content: &expectedContent, CurHash: hash}
-	assert.True(t, IsValidBlockHash(block))
+	assert.True(t, IsValidBlockHash(&block))
 	block.CurHash = nil
-	assert.False(t, IsValidBlockHash(block))
+	assert.False(t, IsValidBlockHash(&block))
 }
 
 func TestIsSameBlock(t *testing.T) {
@@ -89,10 +89,10 @@ func TestIsSameBlock(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, IsValidBlockHash(block))
 
-	bytes, err := proto.Marshal(&block)
+	bytes, err := proto.Marshal(block)
 	assert.Nil(t, err)
 	reBlock, reErr := FromBytesToBlock(bytes)
 	assert.Nil(t, reErr)
 	assert.True(t, IsValidBlockHash(reBlock))
-	assert.True(t, IsSameBlock(&block, &reBlock))
+	assert.True(t, IsSameBlock(block, reBlock))
 }

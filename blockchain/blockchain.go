@@ -82,7 +82,7 @@ func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
 	defer bc.Mu.Unlock()
 
 	// 0. Validate block.
-	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
+	if isValid := mao_utils.IsValidBlockHash(&block); isValid == false {
 		return nil, errors.New("The block is invalid.")
 	}
 	// 1. Add the block to staged area in order by sequence number.
@@ -117,7 +117,7 @@ func (bc *Blockchain) CommitBlock(block pb.Block) ([]*pb.Block, error) {
 
 // CreateNewPendingBlock creates a block at pending chain. Append the block to pending chain and returns.
 // This function is thread safe.
-func (bc *Blockchain) CreateNewPendingBlock(txs []*pb.Transaction) (pb.Block, error) {
+func (bc *Blockchain) CreateNewPendingBlock(txs []*pb.Transaction) (*pb.Block, error) {
 	bc.Mu.Lock()
 	defer bc.Mu.Unlock()
 
@@ -127,18 +127,22 @@ func (bc *Blockchain) CreateNewPendingBlock(txs []*pb.Transaction) (pb.Block, er
 	}
 	newBlock, err := mao_utils.CreateBlockFromTxsAndPrevHash(txs, lastBlock.CurHash)
 	if err != nil {
-		return pb.Block{}, err
+		return nil, err
 	}
 	bc.Pending.PushBack(newBlock)
 	// Assign all TX as status PENDING.
 	if err := bc.setTxsStatus(txs, pb.TransactionStatus_PENDING, false); err != nil {
-		return pb.Block{}, err
+		return nil, err
 	}
 	return newBlock, nil
 }
 
 // Returns the status of a transaction, REJECT if the transaction is not found in chain.
+// This function is thread safe.
 func (bc *Blockchain) GetTransactionStatus(txUuid string) pb.TransactionStatus {
+	bc.Mu.RLock()
+	defer bc.Mu.RUnlock()
+
 	if status, ok := bc.TxStatus[txUuid]; ok {
 		return status
 	}

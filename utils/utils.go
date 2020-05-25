@@ -18,30 +18,30 @@ func IsSameBytes(left []byte, right []byte) bool {
 	return true
 }
 
-func FromBytesToBlock(bytes []byte) (pb.Block, error) {
-	var Block pb.Block
-	err := proto.Unmarshal(bytes, &Block)
-	return Block, err
+func FromBytesToBlock(bytes []byte) (*pb.Block, error) {
+	var block pb.Block
+	err := proto.Unmarshal(bytes, &block)
+	return &block, err
 }
 
 // Create a block from:
 // 1. A list of transactions
 // 2. Previous Hash
-func CreateBlockFromTxsAndPrevHash(txs []*pb.Transaction, prevHash []byte) (pb.Block, error) {
+func CreateBlockFromTxsAndPrevHash(txs []*pb.Transaction, prevHash []byte) (*pb.Block, error) {
 	block := pb.Block{Content: &pb.BlockContent{Txs: txs, PrevHash: prevHash}}
 	bytes, err := proto.Marshal(block.Content)
 	if err != nil {
-		return pb.Block{}, err
+		return nil, err
 	}
 	h := sha256.New()
 	if _, err := h.Write(bytes); err != nil {
-		return pb.Block{}, nil
+		return nil, nil
 	}
 	block.CurHash = h.Sum(nil)
-	return block, nil
+	return &block, nil
 }
 
-func IsValidBlockHash(block pb.Block) bool {
+func IsValidBlockHash(block *pb.Block) bool {
 	h := sha256.New()
 	byteContent, _ := proto.Marshal(block.Content)
 	if _, err := h.Write(byteContent); err != nil {
@@ -55,7 +55,7 @@ func GetLastBlockFromArray(blocks []*pb.Block) *pb.Block {
 }
 
 func IsSameBlock(left *pb.Block, right *pb.Block) bool {
-	if !IsSameBytes(left.CurHash, right.CurHash) || !IsValidBlockHash(*left) || !IsValidBlockHash(*right) {
+	if !IsSameBytes(left.CurHash, right.CurHash) || !IsValidBlockHash(left) || !IsValidBlockHash(right) {
 		return false
 	}
 	return true
