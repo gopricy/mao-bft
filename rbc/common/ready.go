@@ -32,19 +32,20 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	if err != nil{
 		return nil, errors.Wrap(err, "Can't get name in context")
 	}
-	c.Debugf(`Get READY "%s" with root "%s"`, name, merkle.MerkleRootToString(req.MerkleRoot))
+	c.Debugf(`Get READY from "%s" with root "%.4s"`, name, merkle.MerkleRootToString(req.MerkleRoot))
 
 	// TODO: after getting f+1 READY: Send Ready if not Sent
 	r, err := c.ReadiesReceived.Add(name, req.MerkleRoot, struct{}{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Can't add this MerkleRoot to readiesReceived")
 	}
 
 	if r == c.ByzantineLimit+1 {
 		if !c.readyIsSent(req.MerkleRoot) {
 			for _, p := range c.RBCSetting.AllPeers {
 				c.Debugf("Send Ready to %#v", p)
-				c.SendReady(p, req.MerkleRoot)
+				// TODO: Don't understand why this SendReady always fail in GRPC
+				//c.SendReady(p, req.MerkleRoot)
 			}
 		}
 	}
@@ -60,6 +61,8 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			if err != nil {
 				return nil, err
 			}
+
+			c.Infof("RBC Receive with data %s", data)
 			if err := c.App.RBCReceive(block); err != nil {
 				return nil, err
 			}
