@@ -83,7 +83,7 @@ func (q *EventQueue) GetTransactions(maxTx int) ([]*pb.Transaction, error) {
 	q.Mu.Lock()
 	defer q.Mu.Unlock()
 
-	if maxTx == 0 || q.Q.Len() == 0 {
+	if maxTx == 0 {
 		return nil, errors.New("Block must contain more that 0 transactions")
 	}
 
