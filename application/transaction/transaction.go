@@ -7,6 +7,7 @@ import (
 	"github.com/gopricy/mao-bft/rbc/follower"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
+	"sync"
 )
 
 const MaximumTxn = 1000000
@@ -72,6 +73,7 @@ type Leader struct{
 	Leader RBCLeader
 	*common
 	MaxBlockSize int
+	mu sync.Mutex
 }
 
 func (l *Leader) SetRBCLeader(leader RBCLeader){
@@ -138,8 +140,11 @@ func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
 	return u, nil
 }
 
-
+// This function is critical section that permits only single entry.
 func (l *Leader) createBlockAndSend() error{
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	txs, err := l.Queue.GetTransactions(l.MaxBlockSize)
 	if err != nil{
 		return err
