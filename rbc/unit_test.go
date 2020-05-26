@@ -15,11 +15,11 @@ import (
 )
 
 type MockLeader struct {
-	leader.Leader
+	*leader.Leader
 }
 
 type MockFollower struct {
-	follower.Follower
+	*follower.Follower
 	savedPrepare []*pb.Payload
 	savedEcho    []*pb.Payload
 	savedReady   []*pb.ReadyRequest

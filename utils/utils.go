@@ -18,10 +18,14 @@ func IsSameBytes(left []byte, right []byte) bool {
 	return true
 }
 
-func FromBytesToBlock(bytes []byte) (*pb.Block, error) {
+func DecodeBlock(bytes []byte) (*pb.Block, error) {
 	block := new(pb.Block)
 	err := proto.Unmarshal(bytes, block)
 	return block, err
+}
+
+func EncodeBlock(b *pb.Block) ([]byte, error){
+	return proto.Marshal(b)
 }
 
 // Create a block from:

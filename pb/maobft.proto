@@ -46,11 +46,10 @@ message BlockContent {
   bytes prev_hash = 2;
 }
 
-message SimpleKeyValueStoreMessage {
-  // the key that we're changing value.
-  string key = 1;
+message NewAccountMessage {
+  string id = 1;
   // the value we assign to this key.
-  string value = 2;
+  int32 amount = 2;
 }
 
 // This message contains the message for a simple wire system.
@@ -71,13 +70,11 @@ message Transaction {
   // Optional, unique identifier of a transaction.
   string transaction_uuid = 1;
   oneof message {
-    SimpleKeyValueStoreMessage kv_pair_msg = 2;
+    NewAccountMessage newact_msg = 2;
     WireMessage wire_msg = 3;
     DepositMessage deposit_msg = 4;
   }
 }
-
-
 
 message PrepareResponse{}
 

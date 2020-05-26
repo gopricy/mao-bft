@@ -12,9 +12,9 @@ type Leader struct {
 	common.Common
 }
 
-func NewLeader(name string, app common.Application, faultLimit int, peers []*common.Peer) Leader {
+func NewLeader(name string, app common.Application, faultLimit int, peers []*common.Peer) *Leader {
 	setting := common.RBCSetting{AllPeers: peers, ByzantineLimit: faultLimit}
-	return Leader{Common: common.NewCommon(name, setting, app)}
+	return &Leader{Common: common.NewCommon(name, setting, app)}
 }
 
 func (l *Leader) RBCSend(bytes[]byte) {
@@ -37,7 +37,7 @@ func (l *Leader) RBCSend(bytes[]byte) {
 	}
 
 	for i, p := range l.AllPeers {
-		l.Infof(`Send PREPARE "%s" to %#v`, splits[i], p)
+		l.Infof(`Send PREPARE "%.4s" to %#v`, splits[i], p)
 		proof, err := merkle.GetProof(merkleTree, contents[i])
 		if err != nil {
 			panic(err)

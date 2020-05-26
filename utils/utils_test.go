@@ -34,7 +34,7 @@ func TestFromBytesToBlock(t *testing.T) {
 	}
 	bytes, err := proto.Marshal(&block)
 	assert.Nil(t, err)
-	reBlock, err := FromBytesToBlock(bytes)
+	reBlock, err := DecodeBlock(bytes)
 	assert.Nil(t, err)
 	assert.True(t, IsSameBytes(reBlock.CurHash, block.CurHash))
 	assert.Equal(t, reBlock.Content.Txs[0].TransactionUuid, "abc")
@@ -49,7 +49,7 @@ func TestFromBytesToBlock_ReconstructIsStillValid(t *testing.T) {
 
 	bytes, err := proto.Marshal(block)
 	assert.Nil(t, err)
-	reBlock, reErr := FromBytesToBlock(bytes)
+	reBlock, reErr := DecodeBlock(bytes)
 	assert.Nil(t, reErr)
 	assert.True(t, IsSameBytes(reBlock.CurHash, block.CurHash))
 	assert.Equal(t, reBlock.Content.Txs[0].TransactionUuid, "abc")
@@ -91,7 +91,7 @@ func TestIsSameBlock(t *testing.T) {
 
 	bytes, err := proto.Marshal(block)
 	assert.Nil(t, err)
-	reBlock, reErr := FromBytesToBlock(bytes)
+	reBlock, reErr := DecodeBlock(bytes)
 	assert.Nil(t, reErr)
 	assert.True(t, IsValidBlockHash(reBlock))
 	assert.True(t, IsSameBlock(block, reBlock))

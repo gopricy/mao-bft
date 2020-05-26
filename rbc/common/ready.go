@@ -57,17 +57,17 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			if err != nil {
 				return nil, err
 			}
-			c.Infof("Data reconstructed %s", data)
+			c.Infof("Data reconstructed")
 			// TODO: add it back when block and app is finished
 			//block, err := mao_utils.FromBytesToBlock(data)
 			//if err != nil {
 			//	return nil, err
 			//}
 
-			c.Infof("RBC Receive with data %s", data)
-			//if err := c.App.RBCReceive(block); err != nil {
-			//	return nil, err
-			//}
+			c.Infof("RBC Receive with data %.4s", data)
+			if err := c.App.RBCReceive(data); err != nil {
+				return nil, errors.Wrap(err, "failed to apply the apply the transaction")
+			}
 		}
 	}
 

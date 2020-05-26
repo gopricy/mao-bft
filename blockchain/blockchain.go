@@ -24,13 +24,14 @@ type Blockchain struct {
 	Mu sync.RWMutex
 }
 
-// Init internal data structure.
-func (bc *Blockchain) Init() {
-	bc.Pending = list.New()
+func NewBlockchain() *Blockchain{
+	res := new(Blockchain)
+	res.Pending = list.New()
 	// The first block in blockchain should have hash of 0.
-	bc.Chain = append(bc.Chain, &pb.Block{CurHash: []byte{0}})
-	bc.TxStatus = make(map[string]pb.TransactionStatus)
-	bc.Staged = make(map[string]*pb.Block)
+	res.Chain = append(res.Chain, &pb.Block{CurHash: []byte{0}})
+	res.TxStatus = make(map[string]pb.TransactionStatus)
+	res.Staged = make(map[string]*pb.Block)
+	return res
 }
 
 // Add block to staged area, key to it's previous block's CurHash.

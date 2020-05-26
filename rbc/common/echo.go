@@ -19,7 +19,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	if err != nil{
 		return nil, errors.Wrap(err, "Can't get name in context")
 	}
-	c.Debugf(`Get ECHO Message with data "%s" from %s`, req.Data, name)
+	c.Debugf(`Get ECHO Message with data "%.4s" from %s`, req.Data, name)
 	e, err := c.EchosReceived.Add(name, req.MerkleProof.Root, req)
 	if err != nil {
 		return nil, err
@@ -48,10 +48,10 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			//if err != nil {
 			//	return nil, err
 			//}
-			c.Infof("Data reconstructed %s", data)
-			//if err := c.App.RBCReceive(block); err != nil {
-			//	return nil, err
-			//}
+			c.Infof("Data reconstructed %.6s", data)
+			if err := c.App.RBCReceive(data); err != nil {
+				return nil, errors.Wrap(err, "Failed to apply the transaction")
+			}
 		}
 	}
 	return &pb.EchoResponse{}, nil
