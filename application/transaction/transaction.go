@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"github.com/golang/protobuf/proto"
 	"github.com/gopricy/mao-bft/blockchain"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/follower"
@@ -27,13 +28,17 @@ type RBCLeader interface{
 type common struct{
 	Queue *EventQueue
 	Blockchain *blockchain.Blockchain
+	// Ledger stores the committed states of transactions.
 	Ledger *Ledger
+	// PendingLedger stores the ledger after applying all Tx in event queue.
+	PendingLedger *Ledger
 }
 
 func newcommon() *common{
 	res := new(common)
 	res.Queue = new(EventQueue)
 	res.Ledger = NewLedger()
+	res.PendingLedger = NewLedger()
 	res.Blockchain = blockchain.NewBlockchain()
 	return res
 }
@@ -80,20 +85,24 @@ func NewLeader(blocksize int) *Leader{
 	return res
 }
 
+// TODO: expose this API in a binary.
 func (l *Leader) ProposeTransfer(from, to string, dollar, cents int) (string, error){
 	if dollar > MaximumTxn || cents >= 100 || cents < 0{
 		return "", errors.New("invalid amount, transaction limit is 1M")
 	}
 	txn := &pb.Transaction{
 		Message: &pb.Transaction_WireMsg{
-			&pb.WireMessage{
+			WireMsg: &pb.WireMessage{
 				FromId: from,
 				ToId: to,
 				Amount: int32(dollar * 100 + cents),
 			},
 		},
 	}
-	u, t, err := l.Queue.AddTxToEventQueue(txn)
+	if !l.PendingLedger.ValidateTransaction(txn) {
+		return "", errors.New("Invalid transaction: " + proto.MarshalTextString(txn))
+	}
+	u, t, err := l.Queue.AddTxToEventQueue(txn, l.PendingLedger)
 	if err != nil{
 		return "", err
 	}
@@ -117,7 +126,7 @@ func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
 			},
 		},
 	}
-	u, t, err := l.Queue.AddTxToEventQueue(txn)
+	u, t, err := l.Queue.AddTxToEventQueue(txn, l.PendingLedger)
 	if err != nil{
 		return "", err
 	}

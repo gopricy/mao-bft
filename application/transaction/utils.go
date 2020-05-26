@@ -3,6 +3,7 @@ package transaction
 import (
 	"container/list"
 	"errors"
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/gopricy/mao-bft/pb"
 	"sync"
@@ -55,17 +56,52 @@ func (l *Ledger) CommitTxn(txn *pb.Transaction) error{
 	return nil
 }
 
+func (l *Ledger) ValidateTransaction(txn *pb.Transaction) bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	switch v := txn.Message.(type) {
+		case *pb.Transaction_WireMsg:
+			// FROM account should exist and not over withdraw.
+			val, ok := l.Accounts[v.WireMsg.FromId]
+			if !ok || v.WireMsg.Amount < 0 || val < v.WireMsg.Amount {
+				return false
+			}
+			// TO account should exist.
+			val, ok = l.Accounts[v.WireMsg.ToId]
+			if !ok {
+				return false
+			}
+			break
+		case *pb.Transaction_DepositMsg:
+			// Deposit should be greater than 0.
+			if v.DepositMsg.Amount < 0 {
+				return false
+			}
+			break
+		default:
+			return false
+		}
+	return true
+}
+
 // A event queue is a double sided queue that buffers the client proposed transaction.
 type EventQueue struct {
 	Q list.List
 	Mu sync.RWMutex
 }
 
-// Add a transaction to event queue, it assigns a UUID to input transaction.
+// Add a transaction to event queue if it's valid, it assigns a UUID to input transaction.
 // This queue is managed by TransactionService.
-func (q *EventQueue) AddTxToEventQueue(tx *pb.Transaction) (string, int, error) {
+func (q *EventQueue) AddTxToEventQueue(tx *pb.Transaction, pendingLedger *Ledger) (string, int, error) {
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
+
 	if tx.TransactionUuid != "" {
-		return "", 0, errors.New("uuid can not be set by client")
+		return "", -1, errors.New("uuid can not be set by client")
+	}
+	if !pendingLedger.ValidateTransaction(tx) {
+		return "", -1, errors.New("Invalid Transaction: " + proto.MarshalTextString(tx))
 	}
 
 	id, err := uuid.NewUUID()
@@ -75,9 +111,11 @@ func (q *EventQueue) AddTxToEventQueue(tx *pb.Transaction) (string, int, error) 
 	uuidStr := id.String()
 	tx.TransactionUuid = uuidStr
 
-	q.Mu.Lock()
-	defer q.Mu.Unlock()
+
 	q.Q.PushBack(tx)
+	if err := pendingLedger.CommitTxn(tx); err != nil {
+		return "", -1, errors.New("Cannot commit transaction in pending ledger.")
+	}
 	return uuidStr, q.Q.Len(), nil
 }
 

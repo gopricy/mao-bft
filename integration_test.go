@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -38,7 +39,7 @@ func init(){
 	}
 }
 
-func mockTransactions(t *testing.T) map[string]int32{
+func mockTransactions() map[string]int32{
 	propose := func(id string, err error){
 		if err != nil{
 			panic(err)
@@ -55,7 +56,25 @@ func mockTransactions(t *testing.T) map[string]int32{
 	return expected
 }
 
-func startFollower(t *testing.T, index int) (stopper func()){
+func mockInvalidTransactions() (map[string]int32, []error){
+	var errs []error
+	propose := func(id string, err error){
+		if err != nil{
+			errs = append(errs, err)
+		}
+		trans = append(trans, id)
+	}
+	propose(leaderApp.ProposeDeposit("001", 50, 50))
+	propose(leaderApp.ProposeDeposit("002", 100, 0))
+	propose(leaderApp.ProposeTransfer("001", "002", 30, 0))
+	propose(leaderApp.ProposeTransfer("001", "002", 30, 0))
+	expected := map[string]int32{}
+	expected["001"] = 2050
+	expected["002"] = 13000
+	return expected, errs
+}
+
+func startFollower(t *testing.T, index int) (stopper func(), teardown func()){
 	f := follower.NewFollower(fmt.Sprintf("f%d", index), followerApps[index-1], faultLimit, allPeers[:])
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort + index))
 	assert.Nil(t, err)
@@ -67,10 +86,10 @@ func startFollower(t *testing.T, index int) (stopper func()){
 	g.Go(func() error{
 		return s.Serve(lis)
 	})
-	return s.GracefulStop
+	return s.GracefulStop, s.Stop
 }
 
-func startLeader(t *testing.T) (mao rbc.Mao, stopper func()){
+func startLeader(t *testing.T) (mao rbc.Mao, stopper func(), teardown func()){
 	l := leader.NewLeader("mao", leaderApp, faultLimit, allPeers[:])
 	leaderApp.SetRBCLeader(l)
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort))
@@ -83,22 +102,30 @@ func startLeader(t *testing.T) (mao rbc.Mao, stopper func()){
 	g.Go(func() error{
 		return s.Serve(lis)
 	})
-	return l, s.GracefulStop
+	return l, s.GracefulStop, s.Stop
 }
 
+func tearDownConnections(teardown []func()) {
+	for _, t := range teardown {
+		t()
+	}
+}
 
-func TestIntegration(t *testing.T) {
+func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	var stoppers []func()
-	_, s := startLeader(t)
+	var teardown []func()
+	_, s, tear := startLeader(t)
 	stoppers = append(stoppers, s)
+	teardown = append(teardown, tear)
 
 	logging.SetLevel(logging.INFO, "RBC")
 	for i := 1; i < 4; i ++{
-		s := startFollower(t, i)
+		s, tear := startFollower(t, i)
 		stoppers = append(stoppers, s)
+		teardown = append(teardown, tear)
 	}
 
-	exp := mockTransactions(t)
+	exp := mockTransactions()
 
 	time.Sleep(time.Second * 1)
 	for _, s := range stoppers {
@@ -115,4 +142,41 @@ func TestIntegration(t *testing.T) {
 	for _, l := range ledgers{
 		assert.Equal(t, exp, l.Accounts)
 	}
+
+	// Teardown all open connections
+	for _, tear := range teardown {
+		tear()
+	}
+}
+
+func TestIntegration_InvalidTransaction(t *testing.T) {
+	var stoppers []func()
+	_, s, _ := startLeader(t)
+	stoppers = append(stoppers, s)
+
+	logging.SetLevel(logging.INFO, "RBC")
+	for i := 1; i < 4; i ++{
+		s, _ := startFollower(t, i)
+		stoppers = append(stoppers, s)
+	}
+
+	exp, errs := mockInvalidTransactions()
+
+	time.Sleep(time.Second * 1)
+	for _, s := range stoppers {
+		s()
+	}
+
+	assert.Nil(t, g.Wait())
+
+	ledgers := []*transaction.Ledger{leaderApp.Ledger}
+	for _, f := range followerApps{
+		ledgers = append(ledgers, f.Ledger)
+	}
+
+	for _, l := range ledgers{
+		assert.Equal(t, exp, l.Accounts)
+	}
+	assert.Equal(t, len(errs), 1)
+	assert.True(t, strings.Contains(errs[0].Error(), "Invalid transaction:"))
 }
