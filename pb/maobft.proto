@@ -70,9 +70,8 @@ message Transaction {
   // Optional, unique identifier of a transaction.
   string transaction_uuid = 1;
   oneof message {
-    NewAccountMessage newact_msg = 2;
-    WireMessage wire_msg = 3;
-    DepositMessage deposit_msg = 4;
+    WireMessage wire_msg = 2;
+    DepositMessage deposit_msg = 3;
   }
 }
 

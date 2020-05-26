@@ -105,30 +105,6 @@ func (l *Leader) ProposeTransfer(from, to string, dollar, cents int) (string, er
 	return u, nil
 }
 
-func (l *Leader) ProposeNewAccount(id string, dollar, cents int) (string, error){
-	if dollar > MaximumTxn || cents >= 100 || cents < 0{
-		return "", errors.New("invalid amount, transaction limit is 1M")
-	}
-	txn := &pb.Transaction{
-		Message: &pb.Transaction_NewactMsg{
-			&pb.NewAccountMessage{
-				Id: id,
-				Amount: int32(dollar * 100 + cents),
-			},
-		},
-	}
-	u, t, err := l.Queue.AddTxToEventQueue(txn)
-	if err != nil{
-		return "", err
-	}
-	if t == l.MaxBlockSize{
-		if err := l.createBlockAndSend(); err != nil{
-			return "", err
-		}
-	}
-	return u, nil
-}
-
 func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
 	if dollar > MaximumTxn || cents >= 100 || cents < 0{
 		return "", errors.New("invalid amount, transaction limit is 1M")

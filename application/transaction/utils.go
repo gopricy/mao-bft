@@ -43,9 +43,12 @@ func (l *Ledger) CommitTxn(txn *pb.Transaction) error{
 		l.Accounts[v.WireMsg.FromId] -= v.WireMsg.Amount
 		l.Accounts[v.WireMsg.ToId] += v.WireMsg.Amount
 	case *pb.Transaction_DepositMsg:
-		l.Accounts[v.DepositMsg.AccountId] += v.DepositMsg.Amount
-	case *pb.Transaction_NewactMsg:
-		l.Accounts[v.NewactMsg.Id] = v.NewactMsg.Amount
+		if _, ok := l.Accounts[v.DepositMsg.AccountId]; ok {
+			l.Accounts[v.DepositMsg.AccountId] += v.DepositMsg.Amount
+		} else {
+			l.Accounts[v.DepositMsg.AccountId] = v.DepositMsg.Amount
+		}
+
 	default:
 		return errors.New("unsupported txn type")
 	}

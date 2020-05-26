@@ -45,8 +45,8 @@ func mockTransactions(t *testing.T) map[string]int32{
 		}
 		trans = append(trans, id)
 	}
-	propose(leaderApp.ProposeNewAccount("001", 50, 50))
-	propose(leaderApp.ProposeNewAccount("002", 100, 0))
+	propose(leaderApp.ProposeDeposit("001", 50, 50))
+	propose(leaderApp.ProposeDeposit("002", 100, 0))
 	propose(leaderApp.ProposeTransfer("001", "002", 30, 0))
 	propose(leaderApp.ProposeDeposit("002", 0, 50))
 	expected := map[string]int32{}
