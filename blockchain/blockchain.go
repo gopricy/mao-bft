@@ -159,3 +159,33 @@ func (bc *Blockchain) GetTransactionStatus(txUuid string) pb.TransactionStatus {
 	}
 	return pb.TransactionStatus_REJECTED
 }
+
+// GetAllTxInOrder returns 2 lists,
+// the first list is all transactions that is either committed or pending,
+// the second list indicates whether transaction is committed.
+func (bc *Blockchain) GetAllTxInOrder() ([]*pb.Transaction, []bool) {
+	bc.Mu.RLock()
+	defer bc.Mu.RUnlock()
+
+	var allTxs []*pb.Transaction
+	var isTxCommitted []bool
+	for _, block := range bc.Chain {
+		if block.Content == nil {
+			continue
+		}
+		for _, tx := range block.Content.Txs {
+			allTxs = append(allTxs, tx)
+			isTxCommitted = append(isTxCommitted, true)
+		}
+	}
+
+	for iter := bc.Pending.Front(); iter != nil; iter = iter.Next() {
+		block := iter.Value.(*pb.Block)
+		for _, tx := range block.Content.Txs {
+			allTxs = append(allTxs, tx)
+			isTxCommitted = append(isTxCommitted, false)
+		}
+	}
+
+	return allTxs, isTxCommitted
+}

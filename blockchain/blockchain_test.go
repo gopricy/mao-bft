@@ -202,3 +202,10 @@ func TestBlockchain_GetTransactionStatus(t *testing.T) {
 	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_COMMITTED)
 	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_COMMITTED)
 }
+
+func TestBlockchain_GetAllTxInOrder(t *testing.T) {
+	bc := getSampleBlockchain()
+	txs, isCommit := bc.GetAllTxInOrder()
+	assert.Equal(t, len(txs), 4)
+	assert.Equal(t, len(isCommit), 4)
+}
