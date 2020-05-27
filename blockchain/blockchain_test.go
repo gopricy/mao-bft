@@ -33,9 +33,9 @@ func constructWireTransaction(txUuid string, amount int, from string, to string)
 	}
 }
 
-// Create a sample blockchain that contains a single block in each of staged/committed/pending area.
+// Create a sample non-persistent blockchain that contains a single block in each of staged/committed/pending area.
 func getSampleBlockchain() *Blockchain {
-	bc := NewBlockchain()
+	bc := NewBlockchain("")
 	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
 		[]*pb.Transaction{
 			constructDepositTransaction("1", 10, "user1"),
@@ -73,7 +73,7 @@ func getSampleBlockchain() *Blockchain {
 }
 
 func TestBlockchain_Init(t *testing.T) {
-	bc := NewBlockchain()
+	bc := NewBlockchain("")
 	assert.NotNil(t, bc.Pending)
 	assert.Equal(t, len(bc.Chain), 1)
 	assert.True(t, mao_utils.IsSameBytes(bc.Chain[0].CurHash, []byte{0}))
@@ -82,7 +82,7 @@ func TestBlockchain_Init(t *testing.T) {
 }
 
 func TestBlockchain_CommitBlock_CommitSingleBlock(t *testing.T) {
-	bc := NewBlockchain()
+	bc := NewBlockchain("")
 
 	block, err := mao_utils.CreateBlockFromTxsAndPrevHash(
 		[]*pb.Transaction{
@@ -167,7 +167,7 @@ func TestBlockchain_CreateNewPendingBlock(t *testing.T) {
 
 // Do some fancy operation and test status.
 func TestBlockchain_GetTransactionStatus(t *testing.T) {
-	bc := NewBlockchain()
+	bc := NewBlockchain("")
 	// Get non-exist.
 	assert.Equal(t, bc.GetTransactionStatus("3"), pb.TransactionStatus_REJECTED)
 
@@ -202,7 +202,8 @@ func TestBlockchain_GetTransactionStatus(t *testing.T) {
 
 func TestBlockchain_GetAllTxInOrder(t *testing.T) {
 	bc := getSampleBlockchain()
-	txs, isCommit := bc.GetAllTxInOrder()
-	assert.Equal(t, len(txs), 4)
+	blocks, isCommit := bc.GetAllBlocksInOrder()
+	assert.Equal(t, len(blocks), 4)
 	assert.Equal(t, len(isCommit), 4)
 }
+

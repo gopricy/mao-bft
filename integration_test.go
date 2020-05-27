@@ -22,6 +22,7 @@ const leaderPort = 8000
 const address = "127.0.0.1"
 const faultLimit = 1
 const followerNum = 3
+
 var g errgroup.Group
 
 var allPeers [followerNum + 1]*common.Peer
@@ -32,10 +33,10 @@ var trans []string
 
 func initPeers(){
 	allPeers[0] = &common.Peer{Name: "mao", PORT: leaderPort, IP: address}
-	leaderApp = transaction.NewLeader(1)
+	leaderApp = transaction.NewLeader(1, "")
 	for i := 0; i < followerNum; i ++{
 		allPeers[i + 1] = &common.Peer{Name: fmt.Sprintf("f%d", i+1), PORT: leaderPort + 1 + i, IP: address}
-		followerApps[i] = transaction.NewFollower()
+		followerApps[i] = transaction.NewFollower("")
 	}
 }
 

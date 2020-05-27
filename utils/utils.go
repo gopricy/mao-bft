@@ -2,6 +2,7 @@ package mao_utils
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"github.com/golang/protobuf/proto"
 	"github.com/gopricy/mao-bft/pb"
 )
@@ -63,4 +64,11 @@ func IsSameBlock(left *pb.Block, right *pb.Block) bool {
 		return false
 	}
 	return true
+}
+
+// File name is of format <state>_<hex CurHash>
+func GetFileNameFromBlockDump(dump pb.BlockDump) string {
+	stage := dump.State.String()
+	hash := hex.EncodeToString(dump.Block.CurHash)
+	return stage + "_" + hash
 }

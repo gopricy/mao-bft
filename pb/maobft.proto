@@ -32,6 +32,21 @@ message Payload{
   bytes data = 2;
 }
 
+enum BlockState {
+  BS_UNKNOWN = 0;
+  BS_PENDING = 1; // Block has been send from leader to followers.
+  BS_STAGED = 2; // Block has been staged in blockchain, but not committed yet.
+  BS_COMMITTED = 3; // Block is committed in chain.
+}
+
+// This serves as the logger for blockchain. Any
+message BlockDump {
+  // The block to log
+  Block block = 1;
+  // The state of blockchain.
+  BlockState state = 2;
+}
+
 message Block {
   // The content of this block, which hashes to cur_hash.
   BlockContent content = 1;

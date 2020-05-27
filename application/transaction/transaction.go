@@ -35,12 +35,12 @@ type common struct{
 	PendingLedger *Ledger
 }
 
-func newcommon() *common{
+func newcommon(dir string) *common{
 	res := new(common)
 	res.Queue = new(EventQueue)
 	res.Ledger = NewLedger()
 	res.PendingLedger = NewLedger()
-	res.Blockchain = blockchain.NewBlockchain()
+	res.Blockchain = blockchain.NewBlockchain(dir)
 	return res
 }
 
@@ -80,9 +80,9 @@ func (l *Leader) SetRBCLeader(leader RBCLeader){
 	l.Leader = leader
 }
 
-func NewLeader(blocksize int) *Leader{
+func NewLeader(blocksize int, dir string) *Leader{
 	res := new(Leader)
-	res.common = newcommon()
+	res.common = newcommon(dir)
 	res.MaxBlockSize = blocksize
 	return res
 }
@@ -166,8 +166,8 @@ type Follower struct{
 	*common
 }
 
-func NewFollower() *Follower{
+func NewFollower(dir string) *Follower{
 	res := new(Follower)
-	res.common = newcommon()
+	res.common = newcommon(dir)
 	return res
 }
