@@ -30,7 +30,7 @@ var followerApps [followerNum]*transaction.Follower
 
 var trans []string
 
-func init(){
+func initPeers(){
 	allPeers[0] = &common.Peer{Name: "mao", PORT: leaderPort, IP: address}
 	leaderApp = transaction.NewLeader(1)
 	for i := 0; i < followerNum; i ++{
@@ -105,13 +105,8 @@ func startLeader(t *testing.T) (mao rbc.Mao, stopper func(), teardown func()){
 	return l, s.GracefulStop, s.Stop
 }
 
-func tearDownConnections(teardown []func()) {
-	for _, t := range teardown {
-		t()
-	}
-}
-
 func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
+	initPeers()
 	var stoppers []func()
 	var teardown []func()
 	_, s, tear := startLeader(t)
@@ -142,14 +137,10 @@ func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	for _, l := range ledgers{
 		assert.Equal(t, exp, l.Accounts)
 	}
-
-	// Teardown all open connections
-	for _, tear := range teardown {
-		tear()
-	}
 }
 
 func TestIntegration_InvalidTransaction(t *testing.T) {
+	initPeers()
 	var stoppers []func()
 	_, s, _ := startLeader(t)
 	stoppers = append(stoppers, s)
