@@ -3,6 +3,9 @@ package rbc
 import (
 	"context"
 	"fmt"
+	"net"
+	"testing"
+
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
@@ -10,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"net"
-	"testing"
 )
 
 type MockLeader struct {
@@ -44,8 +45,8 @@ func (mf *MockFollower) Prepare(ctx context.Context, req *pb.Payload) (*pb.Prepa
 const port = 8009
 
 func TestEcho(t *testing.T) {
-	client := MockLeader{leader.NewLeader("L", nil, 1, nil)}
-	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil)}
+	client := MockLeader{leader.NewLeader("L", nil, 1, nil, nil)}
+	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil, nil)}
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	assert.Nil(t, err)
 	//defer lis.Close()
@@ -55,7 +56,7 @@ func TestEcho(t *testing.T) {
 	pb.RegisterReadyServer(s, &server)
 	pb.RegisterPrepareServer(s, &server)
 	var g errgroup.Group
-	g.Go(func() error{
+	g.Go(func() error {
 		return s.Serve(lis)
 	})
 
@@ -76,4 +77,5 @@ func TestEcho(t *testing.T) {
 
 	s.GracefulStop()
 	assert.Nil(t, g.Wait())
+	assert.Nil(t, lis.Close())
 }

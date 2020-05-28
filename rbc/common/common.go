@@ -3,8 +3,9 @@ package common
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"sync"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/erasure"
@@ -22,13 +23,14 @@ type Received struct {
 }
 
 type contextKey string
-const keyName =  contextKey("name")
+
+const keyName = contextKey("name")
 
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
 	defer er.mu.Unlock()
 	root := merkle.MerkleRootToString(merkleRoot)
-	if er.rec == nil{
+	if er.rec == nil {
 		er.rec = make(map[merkle.RootString]map[string]interface{})
 	}
 	if _, ok := er.rec[root]; !ok {
@@ -43,18 +45,19 @@ func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, err
 }
 
 type RBCSetting struct {
-	AllPeers       []*Peer
+	AllPeers       map[string]*Peer
 	ByzantineLimit int
 }
 
 type Peer struct {
-	Name string
-	IP   string
-	PORT int
-	CONN *grpc.ClientConn
+	Name   string
+	IP     string
+	PORT   int
+	CONN   *grpc.ClientConn
+	PubKey [32]byte
 }
 
-func (p *Peer) GoString() string{
+func (p *Peer) GoString() string {
 	return fmt.Sprintf("%s", p.Name)
 }
 
@@ -76,7 +79,7 @@ type Common struct {
 	EchosReceived   Received
 	ReadiesReceived Received
 
-	NodeName string
+	NodeName    string
 	ReadiesSent sync.Map
 
 	// Below are related to transaction system.
@@ -84,20 +87,20 @@ type Common struct {
 
 	Logger *logging.Logger
 
-	// TODO: remove it from rbc
-	//pb.UnimplementedTransactionServiceServer
-	//Queue Event
+	// privatekey
+	privateKey *[64]byte
 }
 
-func NewCommon(name string, setting RBCSetting, app Application) Common{
+func NewCommon(name string, setting RBCSetting, app Application, privateKey *[64]byte) Common {
 	//format := logging.MustStringFormatter(
 	//	`%{time:15:05:05} %{module} %{message}`
 	//)
 	//log := logging.NewLogBackend(os.Stdout, "name", 0)
 	return Common{RBCSetting: setting,
-		NodeName: name,
-		App: app,
-		Logger: logging.MustGetLogger("RBC"),
+		NodeName:   name,
+		App:        app,
+		Logger:     logging.MustGetLogger("RBC"),
+		privateKey: privateKey,
 	}
 }
 
@@ -121,35 +124,31 @@ func (c *Common) Name() string {
 	return c.NodeName
 }
 
-func (c *Common) Debugf(format string, args ...interface{}){
-	c.Logger.Debugf("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+func (c *Common) Debugf(format string, args ...interface{}) {
+	c.Logger.Debugf("%s:"+format, append([]interface{}{c.Name()}, args...)...)
 }
 
-func (c *Common) Infof(format string, args ...interface{}){
-	c.Logger.Infof("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+func (c *Common) Infof(format string, args ...interface{}) {
+	c.Logger.Infof("%s:"+format, append([]interface{}{c.Name()}, args...)...)
 }
 
-
-
-
-func (c *Common) CreateContext() context.Context{
+func (c *Common) CreateContext() context.Context {
 	md := metadata.Pairs("name", c.Name())
 	return metadata.NewOutgoingContext(context.Background(), md)
 }
 
-func (c *Common) GetNameFromContext(ctx context.Context) (string, error){
+func (c *Common) GetNameFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok{
+	if !ok {
 		return "", errors.New("failed to decode context")
 	}
 	name, ok := md["name"]
-	if !ok{
+	if !ok {
 		return "", errors.New("context doesn't have name")
 	}
 
 	return name[0], nil
 }
-
 
 func (c *Common) ProposeTransaction(
 	ctx context.Context, in *pb.ProposeTransactionRequest) (*pb.ProposeTransactionResponse, error) {
