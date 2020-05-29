@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"fmt"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/erasure"
@@ -63,6 +64,7 @@ func (l *Leader) SendPrepare(p *common.Peer, merkleProof *pb.MerkleProof, data [
 			}
 		}()
 	*/
+	fmt.Println("send to ", p.PORT)
 	_, err := pb.NewPrepareClient(p.GetConn()).Prepare(l.CreateContext(), payload)
 	if err != nil {
 		panic(err)

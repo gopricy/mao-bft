@@ -13,7 +13,6 @@ import (
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 )
 
 type Received struct {
@@ -62,13 +61,13 @@ func (p *Peer) GoString() string {
 }
 
 func (p *Peer) GetConn() *grpc.ClientConn {
-	for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
+	//for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
 		conn, err := createConnection(p.IP, p.PORT)
 		if err == nil {
 			p.CONN = conn
-			break
+			//break
 		}
-	}
+	//}
 	return p.CONN
 }
 

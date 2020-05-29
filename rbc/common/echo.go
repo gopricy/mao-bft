@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/pkg/errors"
@@ -21,10 +22,13 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	}
 	c.Debugf(`Get ECHO Message with data "%.4s" from %s`, req.Data, name)
 	e, err := c.EchosReceived.Add(name, req.MerkleProof.Root, req)
+	fmt.Println("Added")
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("wuwu1")
 	if e == len(c.RBCSetting.AllPeers)-c.ByzantineLimit {
+		fmt.Println("wuwu2")
 		// TODO: interpolate {s'j} from any N-2f leaves received
 		// TODO: recompute Merkle root h' and if h'!=h then abort
 		if !c.readyIsSent(req.MerkleProof.Root) {
@@ -34,6 +38,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			}
 		}
 	}
+	fmt.Println("wuwu3")
 	rootString := merkle.MerkleRootToString(req.MerkleProof.Root)
 	// 2f + 1 Ready and N - 2f Echo, decode and apply
 	if e == len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
@@ -54,6 +59,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			}
 		}
 	}
+	fmt.Println("wuwu4")
 	return &pb.EchoResponse{}, nil
 }
 
@@ -73,6 +79,7 @@ func (c *Common) SendEcho(p *Peer, merkleProof *pb.MerkleProof, data []byte) {
 		}
 	}()*/
 	_, err := pb.NewEchoClient(p.GetConn()).Echo(c.CreateContext(), payload)
+	fmt.Println("wuwu5")
 	if err != nil {
 		panic(err)
 	}

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"github.com/gopricy/mao-bft/pb"
 )
 
@@ -12,5 +13,7 @@ func (c *Common) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareRespo
 		c.Debugf(`Send ECHO "%.4s" to %#v`, req.Data, p)
 		c.SendEcho(p, req.MerkleProof, req.Data)
 	}
+
+	fmt.Println("wuwu6")
 	return &pb.PrepareResponse{}, nil
 }

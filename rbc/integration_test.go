@@ -59,7 +59,8 @@ func TestIntegration(t *testing.T) {
 
 	l.RBCSend([]byte(testTrans))
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
+
 	for _, s := range stoppers {
 		s()
 	}

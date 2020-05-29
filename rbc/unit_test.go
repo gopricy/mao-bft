@@ -77,5 +77,5 @@ func TestEcho(t *testing.T) {
 
 	s.GracefulStop()
 	assert.Nil(t, g.Wait())
-	assert.Nil(t, lis.Close())
+	lis.Close()
 }

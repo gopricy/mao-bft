@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const leaderPort = 8000
+const leaderPort = 8010
 const address = "127.0.0.1"
 
 func InitPeers(byzantineLimit int) (
@@ -59,7 +59,7 @@ func StartFollowers(t *testing.T, apps []common.Application, privKeys []*[64]byt
 		g.Go(func() error {
 			return s.Serve(lis)
 		})
-		stoppers = append(stoppers, s.GracefulStop)
+		stoppers = append(stoppers, s.Stop)
 	}
 	return stoppers
 }
@@ -76,5 +76,5 @@ func StartLeader(t *testing.T, app common.Application, privKey *[64]byte, rs com
 	g.Go(func() error {
 		return s.Serve(lis)
 	})
-	return l, s.GracefulStop
+	return l, s.Stop
 }
