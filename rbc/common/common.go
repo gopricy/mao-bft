@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/gopricy/mao-bft/rbc/sign"
 	"sync"
 
 	"google.golang.org/grpc/metadata"
@@ -20,10 +21,6 @@ type Received struct {
 	rec map[merkle.RootString]map[string]interface{}
 	mu  sync.Mutex
 }
-
-type contextKey string
-
-const keyName = contextKey("name")
 
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
@@ -53,7 +50,7 @@ type Peer struct {
 	IP     string
 	PORT   int
 	CONN   *grpc.ClientConn
-	PubKey [32]byte
+	PubKey sign.PublicKey
 }
 
 func (p *Peer) GoString() string {
@@ -103,6 +100,19 @@ func NewCommon(name string, setting RBCSetting, app Application, privateKey *[64
 	}
 }
 
+func (c *Common) Verify(ctx context.Context, message []byte) ([]byte, bool, string){
+	name, err := c.getNameFromContext(ctx)
+	if err != nil{
+		return nil, false, ""
+	}
+	data, verified := sign.Verify(c.AllPeers[name].PubKey, message)
+	return data, verified, name
+}
+
+func (c *Common) Sign(message []byte) []byte{
+	return sign.Sign(c.privateKey, message)
+}
+
 func (c *Common) reconstructData(root merkle.RootString) ([]byte, error) {
 	payloads := []*pb.Payload{}
 	for _, m := range c.EchosReceived.rec[root] {
@@ -136,7 +146,7 @@ func (c *Common) CreateContext() context.Context {
 	return metadata.NewOutgoingContext(context.Background(), md)
 }
 
-func (c *Common) GetNameFromContext(ctx context.Context) (string, error) {
+func (c *Common) getNameFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return "", errors.New("failed to decode context")
@@ -145,7 +155,6 @@ func (c *Common) GetNameFromContext(ctx context.Context) (string, error) {
 	if !ok {
 		return "", errors.New("context doesn't have name")
 	}
-
 	return name[0], nil
 }
 

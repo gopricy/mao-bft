@@ -1,11 +1,10 @@
+// +build deprecated
+
 package rbc
 
 import (
 	"context"
 	"fmt"
-	"net"
-	"testing"
-
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
@@ -13,6 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"net"
+	"testing"
+	"time"
 )
 
 type MockLeader struct {
@@ -64,18 +66,18 @@ func TestEcho(t *testing.T) {
 
 	client.SendPrepare(peer, &pb.MerkleProof{Root: []byte("root")}, []byte("prepare"))
 	// SendPrepare is async call, let's wait for 0.1s
-	//time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 100)
 	assert.Equal(t, 1, len(server.savedPrepare))
 	assert.Equal(t, []byte("root"), server.savedPrepare[0].MerkleProof.Root)
 	assert.Equal(t, []byte("prepare"), server.savedPrepare[0].Data)
 	client.SendEcho(peer, &pb.MerkleProof{Root: []byte("root")}, []byte("echo"))
 	// SendEcho is async call, let's wait for 0.1s
-	//time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 100)
 	assert.Equal(t, 1, len(server.savedEcho))
 	assert.Equal(t, []byte("root"), server.savedEcho[0].MerkleProof.Root)
 	assert.Equal(t, []byte("echo"), server.savedEcho[0].Data)
 
 	s.GracefulStop()
 	assert.Nil(t, g.Wait())
-	lis.Close()
+	//lis.Close()
 }

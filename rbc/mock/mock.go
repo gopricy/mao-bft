@@ -9,8 +9,8 @@ import (
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
 	"github.com/gopricy/mao-bft/rbc/leader"
+	"github.com/gopricy/mao-bft/rbc/sign"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/nacl/sign"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -18,26 +18,26 @@ import (
 const leaderPort = 8010
 const address = "127.0.0.1"
 
-func InitPeers(byzantineLimit int) (
-	rbcSetting common.RBCSetting,
-	allPrivateKeys []*[64]byte,
-	connCloser func()) {
+func InitPeers(byzantineLimit int) (rbcSetting common.RBCSetting, allPrivateKeys []*[64]byte, connCloser func() error) {
 	rbcSetting.ByzantineLimit = byzantineLimit
 	followerNum := byzantineLimit * 3
-	pub, priv, _ := sign.GenerateKey(nil)
+	pub, priv := sign.GenerateKey()
 	rbcSetting.AllPeers = make(map[string]*common.Peer)
-	rbcSetting.AllPeers["map"] = &common.Peer{Name: "mao", PORT: leaderPort, IP: address, PubKey: *pub}
+	rbcSetting.AllPeers["mao"] = &common.Peer{Name: "mao", PORT: leaderPort, IP: address, PubKey: pub}
 	allPrivateKeys = append(allPrivateKeys, priv)
 	for i := 0; i < followerNum; i++ {
 		name := fmt.Sprintf("f%d", i+1)
-		pub, priv, _ := sign.GenerateKey(nil)
-		rbcSetting.AllPeers[name] = &common.Peer{Name: fmt.Sprintf("f%d", i+1), PORT: leaderPort + 1 + i, IP: address, PubKey: *pub}
+		pub, priv := sign.GenerateKey()
+		rbcSetting.AllPeers[name] = &common.Peer{Name: fmt.Sprintf("f%d", i+1), PORT: leaderPort + 1 + i, IP: address, PubKey: pub}
 		allPrivateKeys = append(allPrivateKeys, priv)
 	}
-	connCloser = func() {
+	connCloser = func() error{
 		for _, p := range rbcSetting.AllPeers {
-			p.CONN.Close()
+			if err := p.CONN.Close(); err != nil{
+				return err
+			}
 		}
+		return nil
 	}
 	return
 }
@@ -59,7 +59,7 @@ func StartFollowers(t *testing.T, apps []common.Application, privKeys []*[64]byt
 		g.Go(func() error {
 			return s.Serve(lis)
 		})
-		stoppers = append(stoppers, s.Stop)
+		stoppers = append(stoppers, s.GracefulStop)
 	}
 	return stoppers
 }
@@ -76,5 +76,5 @@ func StartLeader(t *testing.T, app common.Application, privKey *[64]byte, rs com
 	g.Go(func() error {
 		return s.Serve(lis)
 	})
-	return l, s.Stop
+	return l, s.GracefulStop
 }

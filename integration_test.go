@@ -8,6 +8,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
+	"strings"
 	"testing"
 	"time"
 )
@@ -68,17 +69,18 @@ func createApps(num int) (res []common.Application){
 func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	var g errgroup.Group
 
-	rbcSetting, priKeys, cleaner := mock.InitPeers(faultLimit)
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
 	var stoppers []func()
 	apps := createApps(followerNum + 1)
 	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
 	apps[0].(*transaction.Leader).SetRBCLeader(l)
 	stoppers = append(stoppers, s)
-	mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)
+	ss := mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)
+	stoppers = append(stoppers, ss...)
 
 	exp := mockTransactions(apps[0].(*transaction.Leader))
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 1)
 	for i, s := range stoppers {
 		fmt.Println("stop ", i)
 		s()
@@ -86,7 +88,7 @@ func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 
 	assert.Nil(t, g.Wait())
 
-	ledgers := []*transaction.Ledger{apps[0].(transaction.Leader).Ledger}
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
 	for _, f := range apps[1:] {
 		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
 	}
@@ -94,44 +96,37 @@ func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	for _, l := range ledgers {
 		assert.Equal(t, exp, l.Accounts)
 	}
-	cleaner()
+	//assert.Nil(t, cleaner())
 }
 
-//func TestIntegration_InvalidTransaction(t *testing.T) {
-//	var g errgroup.Group
-//	rbcSetting, priKeys, cleaner := mock.InitPeers(faultLimit)
-//	var stoppers []func()
-//	apps := createApps(followerNum + 1)
-//	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
-//	apps[0].(*transaction.Leader).SetRBCLeader(l)
-//	stoppers = append(stoppers, s)
-//	mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)
-//
-//	exp := mockTransactions(apps[0].(*transaction.Leader))
-//
-//	time.Sleep(time.Second * 1)
-//	for _, s := range stoppers {
-//		s()
-//	}
-//
-//	exp, errs := mockInvalidTransactions(apps[0].(*transaction.Leader))
-//
-//	time.Sleep(time.Second * 1)
-//	for _, s := range stoppers {
-//		s()
-//	}
-//
-//	assert.Nil(t, g.Wait())
-//
-//	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
-//	for _, f := range apps[1:] {
-//		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
-//	}
-//
-//	for _, l := range ledgers {
-//		assert.Equal(t, exp, l.Accounts)
-//	}
-//	assert.Equal(t, len(errs), 1)
-//	assert.True(t, strings.Contains(errs[0].Error(), "Invalid transaction:"))
-//	cleaner()
-//}
+func TestIntegration_InvalidTransaction(t *testing.T) {
+	var g errgroup.Group
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
+	var stoppers []func()
+	apps := createApps(followerNum + 1)
+	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	apps[0].(*transaction.Leader).SetRBCLeader(l)
+	stoppers = append(stoppers, s)
+	stoppers = append(stoppers, mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)...)
+
+	exp, errs := mockInvalidTransactions(apps[0].(*transaction.Leader))
+
+	time.Sleep(time.Second * 1)
+	for _, s := range stoppers {
+		s()
+	}
+
+	assert.Nil(t, g.Wait())
+
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
+	for _, f := range apps[1:] {
+		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
+	}
+
+	for _, l := range ledgers {
+		assert.Equal(t, exp, l.Accounts)
+	}
+	assert.Equal(t, len(errs), 1)
+	assert.True(t, strings.Contains(errs[0].Error(), "Invalid transaction:"))
+	//cleaner()
+}
