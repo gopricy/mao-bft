@@ -3,8 +3,10 @@ package common
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/metadata"
+	"github.com/gopricy/mao-bft/rbc/sign"
 	"sync"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/erasure"
@@ -12,7 +14,6 @@ import (
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 )
 
 type Received struct {
@@ -21,14 +22,11 @@ type Received struct {
 	mu  sync.Mutex
 }
 
-type contextKey string
-const keyName =  contextKey("name")
-
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
 	defer er.mu.Unlock()
 	root := merkle.MerkleRootToString(merkleRoot)
-	if er.rec == nil{
+	if er.rec == nil {
 		er.rec = make(map[merkle.RootString]map[string]interface{})
 	}
 	if _, ok := er.rec[root]; !ok {
@@ -43,29 +41,30 @@ func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, err
 }
 
 type RBCSetting struct {
-	AllPeers       []*Peer
+	AllPeers       map[string]*Peer
 	ByzantineLimit int
 }
 
 type Peer struct {
-	Name string
-	IP   string
-	PORT int
-	CONN *grpc.ClientConn
+	Name   string
+	IP     string
+	PORT   int
+	CONN   *grpc.ClientConn
+	PubKey sign.PublicKey
 }
 
-func (p *Peer) GoString() string{
+func (p *Peer) GoString() string {
 	return fmt.Sprintf("%s", p.Name)
 }
 
 func (p *Peer) GetConn() *grpc.ClientConn {
-	for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
+	//for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
 		conn, err := createConnection(p.IP, p.PORT)
 		if err == nil {
 			p.CONN = conn
-			break
+			//break
 		}
-	}
+	//}
 	return p.CONN
 }
 
@@ -76,7 +75,7 @@ type Common struct {
 	EchosReceived   Received
 	ReadiesReceived Received
 
-	NodeName string
+	NodeName    string
 	ReadiesSent sync.Map
 
 	// Below are related to transaction system.
@@ -84,21 +83,34 @@ type Common struct {
 
 	Logger *logging.Logger
 
-	// TODO: remove it from rbc
-	//pb.UnimplementedTransactionServiceServer
-	//Queue Event
+	// privatekey
+	privateKey *[64]byte
 }
 
-func NewCommon(name string, setting RBCSetting, app Application) Common{
+func NewCommon(name string, setting RBCSetting, app Application, privateKey *[64]byte) Common {
 	//format := logging.MustStringFormatter(
 	//	`%{time:15:05:05} %{module} %{message}`
 	//)
 	//log := logging.NewLogBackend(os.Stdout, "name", 0)
 	return Common{RBCSetting: setting,
-		NodeName: name,
-		App: app,
-		Logger: logging.MustGetLogger("RBC"),
+		NodeName:   name,
+		App:        app,
+		Logger:     logging.MustGetLogger("RBC"),
+		privateKey: privateKey,
 	}
+}
+
+func (c *Common) Verify(ctx context.Context, message []byte) ([]byte, bool, string){
+	name, err := c.getNameFromContext(ctx)
+	if err != nil{
+		return nil, false, ""
+	}
+	data, verified := sign.Verify(c.AllPeers[name].PubKey, message)
+	return data, verified, name
+}
+
+func (c *Common) Sign(message []byte) []byte{
+	return sign.Sign(c.privateKey, message)
 }
 
 func (c *Common) reconstructData(root merkle.RootString) ([]byte, error) {
@@ -121,35 +133,30 @@ func (c *Common) Name() string {
 	return c.NodeName
 }
 
-func (c *Common) Debugf(format string, args ...interface{}){
-	c.Logger.Debugf("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+func (c *Common) Debugf(format string, args ...interface{}) {
+	c.Logger.Debugf("%s:"+format, append([]interface{}{c.Name()}, args...)...)
 }
 
-func (c *Common) Infof(format string, args ...interface{}){
-	c.Logger.Infof("%s:" + format, append([]interface{}{c.Name()}, args...)...)
+func (c *Common) Infof(format string, args ...interface{}) {
+	c.Logger.Infof("%s:"+format, append([]interface{}{c.Name()}, args...)...)
 }
 
-
-
-
-func (c *Common) CreateContext() context.Context{
+func (c *Common) CreateContext() context.Context {
 	md := metadata.Pairs("name", c.Name())
 	return metadata.NewOutgoingContext(context.Background(), md)
 }
 
-func (c *Common) GetNameFromContext(ctx context.Context) (string, error){
+func (c *Common) getNameFromContext(ctx context.Context) (string, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok{
+	if !ok {
 		return "", errors.New("failed to decode context")
 	}
 	name, ok := md["name"]
-	if !ok{
+	if !ok {
 		return "", errors.New("context doesn't have name")
 	}
-
 	return name[0], nil
 }
-
 
 func (c *Common) ProposeTransaction(
 	ctx context.Context, in *pb.ProposeTransactionRequest) (*pb.ProposeTransactionResponse, error) {

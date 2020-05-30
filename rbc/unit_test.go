@@ -1,3 +1,5 @@
+// +build deprecated
+
 package rbc
 
 import (
@@ -12,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 	"net"
 	"testing"
+	"time"
 )
 
 type MockLeader struct {
@@ -44,8 +47,8 @@ func (mf *MockFollower) Prepare(ctx context.Context, req *pb.Payload) (*pb.Prepa
 const port = 8009
 
 func TestEcho(t *testing.T) {
-	client := MockLeader{leader.NewLeader("L", nil, 1, nil)}
-	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil)}
+	client := MockLeader{leader.NewLeader("L", nil, 1, nil, nil)}
+	server := MockFollower{Follower: follower.NewFollower("F", nil, 1, nil, nil)}
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	assert.Nil(t, err)
 	//defer lis.Close()
@@ -55,7 +58,7 @@ func TestEcho(t *testing.T) {
 	pb.RegisterReadyServer(s, &server)
 	pb.RegisterPrepareServer(s, &server)
 	var g errgroup.Group
-	g.Go(func() error{
+	g.Go(func() error {
 		return s.Serve(lis)
 	})
 
@@ -63,17 +66,18 @@ func TestEcho(t *testing.T) {
 
 	client.SendPrepare(peer, &pb.MerkleProof{Root: []byte("root")}, []byte("prepare"))
 	// SendPrepare is async call, let's wait for 0.1s
-	//time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 100)
 	assert.Equal(t, 1, len(server.savedPrepare))
 	assert.Equal(t, []byte("root"), server.savedPrepare[0].MerkleProof.Root)
 	assert.Equal(t, []byte("prepare"), server.savedPrepare[0].Data)
 	client.SendEcho(peer, &pb.MerkleProof{Root: []byte("root")}, []byte("echo"))
 	// SendEcho is async call, let's wait for 0.1s
-	//time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 100)
 	assert.Equal(t, 1, len(server.savedEcho))
 	assert.Equal(t, []byte("root"), server.savedEcho[0].MerkleProof.Root)
 	assert.Equal(t, []byte("echo"), server.savedEcho[0].Data)
 
 	s.GracefulStop()
 	assert.Nil(t, g.Wait())
+	//lis.Close()
 }

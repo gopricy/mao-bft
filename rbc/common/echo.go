@@ -15,11 +15,12 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	//	return nil, merkle.InvalidProof{}
 	//}
 	// Echo calls
-	name, err := c.GetNameFromContext(ctx)
-	if err != nil{
-		return nil, errors.Wrap(err, "Can't get name in context")
+	actualData, verified, name := c.Verify(ctx, req.Data)
+	if !verified{
+		return nil, errors.New("signature invalid")
 	}
-	c.Debugf(`Get ECHO Message with data "%.4s" from %s`, req.Data, name)
+	c.Debugf(`ECHO Message: "%.4s"`, actualData)
+	req.Data = actualData
 	e, err := c.EchosReceived.Add(name, req.MerkleProof.Root, req)
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 func (c *Common) SendEcho(p *Peer, merkleProof *pb.MerkleProof, data []byte) {
 	payload := &pb.Payload{
 		MerkleProof: merkleProof,
-		Data:        data,
+		Data:        c.Sign(data),
 	}
 
 	/*go func() {

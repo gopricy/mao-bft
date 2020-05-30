@@ -12,12 +12,12 @@ type Leader struct {
 	common.Common
 }
 
-func NewLeader(name string, app common.Application, faultLimit int, peers []*common.Peer) *Leader {
+func NewLeader(name string, app common.Application, faultLimit int, peers map[string]*common.Peer, privateKey *[64]byte) *Leader {
 	setting := common.RBCSetting{AllPeers: peers, ByzantineLimit: faultLimit}
-	return &Leader{Common: common.NewCommon(name, setting, app)}
+	return &Leader{Common: common.NewCommon(name, setting, app, privateKey)}
 }
 
-func (l *Leader) RBCSend(bytes[]byte) {
+func (l *Leader) RBCSend(bytes []byte) {
 	//bytes, err := proto.Marshal(block)
 	//if err != nil{
 	//	panic(err)
@@ -32,25 +32,26 @@ func (l *Leader) RBCSend(bytes[]byte) {
 	}
 
 	merkleTree := &merkle.MerkleTree{}
-	if err := merkleTree.Init(contents); err != nil{
+	if err := merkleTree.Init(contents); err != nil {
 		panic(err)
 	}
 
-	for i, p := range l.AllPeers {
+	i := 0
+	for _, p := range l.AllPeers {
 		l.Infof(`Send PREPARE "%.4s" to %#v`, splits[i], p)
 		proof, err := merkle.GetProof(merkleTree, contents[i])
 		if err != nil {
 			panic(err)
 		}
 		l.SendPrepare(p, proof, splits[i])
+		i++
 	}
 }
-
 
 func (l *Leader) SendPrepare(p *common.Peer, merkleProof *pb.MerkleProof, data []byte) {
 	payload := &pb.Payload{
 		MerkleProof: merkleProof,
-		Data:        data,
+		Data:        l.Sign(data),
 	}
 	/*
 		go func() {
