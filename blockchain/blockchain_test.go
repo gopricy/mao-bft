@@ -5,6 +5,8 @@ import (
 	"github.com/gopricy/mao-bft/pb"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -207,3 +209,48 @@ func TestBlockchain_GetAllTxInOrder(t *testing.T) {
 	assert.Equal(t, len(isCommit), 4)
 }
 
+// This test tests that blockchain failover can reconstruct original state.
+func TestBlockchain_Reconcile(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "*")
+	assert.Nil(t, err)
+
+	// Construct a blockchain with persistent storage.
+	bc := NewBlockchain(tmpDir)
+	// Get non-exist.
+	assert.Equal(t, bc.GetTransactionStatus("3"), pb.TransactionStatus_REJECTED)
+
+	pending1, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("1", 10, "user1")})
+	assert.Nil(t, err)
+	assert.Equal(t, len(bc.TxStatus), 1)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_PENDING)
+
+	pending2, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("2", 10, "user2")})
+	assert.Nil(t, err)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_PENDING)
+
+	// Commit 2, this should make pending 2 to staged.
+	committed, err := bc.CommitBlock(pending2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(committed), 0)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_STAGED)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_PENDING)
+
+	// Now failover
+	bc = nil
+	bc = NewBlockchain(tmpDir)
+
+	// Commit 1, this should make everything committed.
+	committed, err = bc.CommitBlock(pending1)
+	assert.Nil(t, err)
+	assert.Equal(t, len(committed), 2)
+	assert.Equal(t, len(bc.TxStatus), 2)
+	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_COMMITTED)
+	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_COMMITTED)
+
+	// Clean up.
+	os.Remove(tmpDir)
+}

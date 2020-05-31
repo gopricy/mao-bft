@@ -41,6 +41,10 @@ func newcommon(dir string) *common{
 	res.Ledger = NewLedger()
 	res.PendingLedger = NewLedger()
 	res.Blockchain = blockchain.NewBlockchain(dir)
+	blocks, isCommit := res.Blockchain.GetAllBlocksInOrder()
+	res.Ledger.Reconcile(blocks, isCommit, true)
+	res.PendingLedger.Reconcile(blocks, isCommit, false)
+
 	return res
 }
 
@@ -52,6 +56,9 @@ func (c *common) RBCReceive(bytes []byte) error {
 		return errors.Wrap(err, "Can't decode Block")
 	}
 	blocks, err := c.Blockchain.CommitBlock(block)
+	if err != nil {
+		return err
+	}
 	for _, b := range blocks{
 		for _, t := range b.Content.Txs{
 			if err := c.Ledger.CommitTxn(t); err != nil{
