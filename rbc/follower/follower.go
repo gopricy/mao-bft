@@ -8,10 +8,7 @@ type Follower struct {
 	common.Common
 }
 
-func NewFollower(name string, app common.Application, faultLimit int, peers []*common.Peer) *Follower {
+func NewFollower(name string, app common.Application, faultLimit int, peers map[string]*common.Peer, privateKey *[64]byte) *Follower {
 	setting := common.RBCSetting{AllPeers: peers, ByzantineLimit: faultLimit}
-	return &Follower{Common: common.NewCommon(name, setting, app)}
+	return &Follower{Common: common.NewCommon(name, setting, app, privateKey)}
 }
-
-
-

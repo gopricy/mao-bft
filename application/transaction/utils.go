@@ -2,10 +2,12 @@ package transaction
 
 import (
 	"container/list"
+	"encoding/hex"
 	"errors"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/gopricy/mao-bft/pb"
+	"log"
 	"sync"
 )
 
@@ -24,6 +26,61 @@ func NewLedger() *Ledger{
 	res := new(Ledger)
 	res.Accounts = map[string]int32{}
 	return res
+}
+
+// ValidateBlock validates that after committing this block, the ledger is still valid.
+func (l *Ledger) ValidateBlock(block *pb.Block) bool {
+	copyMap := make(map[string]int32)
+	for k, v := range l.Accounts {
+		copyMap[k] = v
+	}
+
+	if block.Content == nil {
+		return false
+	}
+
+	for _, tx := range block.Content.Txs {
+		switch v := tx.Message.(type) {
+		case *pb.Transaction_WireMsg:
+			copyMap[v.WireMsg.FromId] -= v.WireMsg.Amount
+			if copyMap[v.WireMsg.FromId] < 0 {
+				return false
+			}
+			copyMap[v.WireMsg.ToId] += v.WireMsg.Amount
+		case *pb.Transaction_DepositMsg:
+			if v.DepositMsg.Amount < 0 {
+				return false
+			}
+			if _, ok := copyMap[v.DepositMsg.AccountId]; ok {
+				copyMap[v.DepositMsg.AccountId] += v.DepositMsg.Amount
+			} else {
+				copyMap[v.DepositMsg.AccountId] = v.DepositMsg.Amount
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// Reconcile will take what already stored in blockchain and reconstruct application internal state.
+func (l *Ledger) Reconcile(blocks []*pb.Block, isCommit []bool, isCommitLedger bool) {
+	for i, block := range blocks {
+		if !l.ValidateBlock(block) {
+			log.Println("block is not valid or no content, hash is: " + hex.EncodeToString(block.CurHash))
+			continue
+		}
+		if isCommitLedger && !isCommit[i] {
+			continue
+		}
+		// Commit a block to ledger.
+		for _, tx := range block.Content.Txs {
+			err := l.CommitTxn(tx)
+			if err != nil {
+				log.Fatalln("err: " + err.Error())
+			}
+		}
+	}
 }
 
 func (l *Ledger) GetBalance(act string) (int, bool){

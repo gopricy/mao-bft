@@ -31,9 +31,9 @@ func InitPeers(byzantineLimit int) (rbcSetting common.RBCSetting, allPrivateKeys
 		rbcSetting.AllPeers[name] = &common.Peer{Name: fmt.Sprintf("f%d", i+1), PORT: leaderPort + 1 + i, IP: address, PubKey: pub}
 		allPrivateKeys = append(allPrivateKeys, priv)
 	}
-	connCloser = func() error{
+	connCloser = func() error {
 		for _, p := range rbcSetting.AllPeers {
-			if err := p.CONN.Close(); err != nil{
+			if err := p.CONN.Close(); err != nil {
 				return err
 			}
 		}
@@ -55,11 +55,11 @@ func StartFollowers(t *testing.T, apps []common.Application, privKeys []*[64]byt
 	return stoppers
 }
 
-func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (error, func()){
+func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (error, func()) {
 	f := follower.NewFollower(fmt.Sprintf("f%d", index+1), app, rs.ByzantineLimit, rs.AllPeers, privKey)
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort+index+1))
-	if err != nil{
-		return err, func(){}
+	if err != nil {
+		return err, func() {}
 	}
 	s := grpc.NewServer()
 
@@ -90,8 +90,8 @@ func StartLeader(t *testing.T, app common.Application, privKey sign.PrivateKey, 
 func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (mao *leader.Leader, stopper func()) {
 	l := leader.NewLeader("mao", app, rs.ByzantineLimit, rs.AllPeers, privKey)
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort))
-	if err != nil{
-		return nil, func(){}
+	if err != nil {
+		return nil, func() {}
 	}
 	s := grpc.NewServer()
 

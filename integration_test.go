@@ -3,46 +3,29 @@ package maobft
 import (
 	"fmt"
 	"github.com/gopricy/mao-bft/application/transaction"
-	"github.com/gopricy/mao-bft/pb"
-	"github.com/gopricy/mao-bft/rbc"
 	"github.com/gopricy/mao-bft/rbc/common"
-	"github.com/gopricy/mao-bft/rbc/follower"
-	"github.com/gopricy/mao-bft/rbc/leader"
+	"github.com/gopricy/mao-bft/rbc/mock"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"net"
 	"strings"
 	"testing"
 	"time"
 )
 
-const leaderPort = 8000
-const address = "127.0.0.1"
 const faultLimit = 1
-const followerNum = 3
+const followerNum = faultLimit * 3
 
-var g errgroup.Group
-
-var allPeers [followerNum + 1]*common.Peer
-var leaderApp *transaction.Leader
-var followerApps [followerNum]*transaction.Follower
 
 var trans []string
 
-func initPeers(){
-	allPeers[0] = &common.Peer{Name: "mao", PORT: leaderPort, IP: address}
-	leaderApp = transaction.NewLeader(1, "")
-	for i := 0; i < followerNum; i ++{
-		allPeers[i + 1] = &common.Peer{Name: fmt.Sprintf("f%d", i+1), PORT: leaderPort + 1 + i, IP: address}
-		followerApps[i] = transaction.NewFollower("")
-	}
+func init(){
+	logging.SetLevel(logging.DEBUG, "RBC")
 }
 
-func mockTransactions() map[string]int32{
-	propose := func(id string, err error){
-		if err != nil{
+func mockTransactions(leaderApp *transaction.Leader) map[string]int32 {
+	propose := func(id string, err error) {
+		if err != nil {
 			panic(err)
 		}
 		trans = append(trans, id)
@@ -57,10 +40,10 @@ func mockTransactions() map[string]int32{
 	return expected
 }
 
-func mockInvalidTransactions() (map[string]int32, []error){
+func mockInvalidTransactions(leaderApp *transaction.Leader) (map[string]int32, []error) {
 	var errs []error
-	propose := func(id string, err error){
-		if err != nil{
+	propose := func(id string, err error) {
+		if err != nil {
 			errs = append(errs, err)
 		}
 		trans = append(trans, id)
@@ -75,84 +58,58 @@ func mockInvalidTransactions() (map[string]int32, []error){
 	return expected, errs
 }
 
-func startFollower(t *testing.T, index int) (stopper func(), teardown func()){
-	f := follower.NewFollower(fmt.Sprintf("f%d", index), followerApps[index-1], faultLimit, allPeers[:])
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort + index))
-	assert.Nil(t, err)
-	s := grpc.NewServer()
-
-	pb.RegisterReadyServer(s, f)
-	pb.RegisterEchoServer(s, f)
-	pb.RegisterPrepareServer(s, f)
-	g.Go(func() error{
-		return s.Serve(lis)
-	})
-	return s.GracefulStop, s.Stop
-}
-
-func startLeader(t *testing.T) (mao rbc.Mao, stopper func(), teardown func()){
-	l := leader.NewLeader("mao", leaderApp, faultLimit, allPeers[:])
-	leaderApp.SetRBCLeader(l)
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort))
-	assert.Nil(t, err)
-	s := grpc.NewServer()
-
-	pb.RegisterEchoServer(s, l)
-	pb.RegisterReadyServer(s, l)
-	pb.RegisterPrepareServer(s, l)
-	g.Go(func() error{
-		return s.Serve(lis)
-	})
-	return l, s.GracefulStop, s.Stop
+func createApps(num int) (res []common.Application){
+	res = append(res, transaction.NewLeader(1, ""))
+	for i := 0; i < num-1; i ++{
+		res = append(res, transaction.NewFollower(""))
+	}
+	return
 }
 
 func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
-	initPeers()
+	var g errgroup.Group
+
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
 	var stoppers []func()
-	var teardown []func()
-	_, s, tear := startLeader(t)
+	apps := createApps(followerNum + 1)
+	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	apps[0].(*transaction.Leader).SetRBCLeader(l)
 	stoppers = append(stoppers, s)
-	teardown = append(teardown, tear)
+	ss := mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)
+	stoppers = append(stoppers, ss...)
 
-	logging.SetLevel(logging.INFO, "RBC")
-	for i := 1; i < 4; i ++{
-		s, tear := startFollower(t, i)
-		stoppers = append(stoppers, s)
-		teardown = append(teardown, tear)
-	}
-
-	exp := mockTransactions()
+	exp := mockTransactions(apps[0].(*transaction.Leader))
 
 	time.Sleep(time.Second * 1)
-	for _, s := range stoppers {
+	for i, s := range stoppers {
+		fmt.Println("stop ", i)
 		s()
 	}
 
 	assert.Nil(t, g.Wait())
 
-	ledgers := []*transaction.Ledger{leaderApp.Ledger}
-	for _, f := range followerApps{
-		ledgers = append(ledgers, f.Ledger)
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
+	for _, f := range apps[1:] {
+		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
 	}
 
-	for _, l := range ledgers{
+	for _, l := range ledgers {
 		assert.Equal(t, exp, l.Accounts)
 	}
+	//assert.Nil(t, cleaner())
 }
 
 func TestIntegration_InvalidTransaction(t *testing.T) {
-	initPeers()
+	var g errgroup.Group
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
 	var stoppers []func()
-	_, s, _ := startLeader(t)
+	apps := createApps(followerNum + 1)
+	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	apps[0].(*transaction.Leader).SetRBCLeader(l)
 	stoppers = append(stoppers, s)
+	stoppers = append(stoppers, mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)...)
 
-	logging.SetLevel(logging.INFO, "RBC")
-	for i := 1; i < 4; i ++{
-		s, _ := startFollower(t, i)
-		stoppers = append(stoppers, s)
-	}
-
-	exp, errs := mockInvalidTransactions()
+	exp, errs := mockInvalidTransactions(apps[0].(*transaction.Leader))
 
 	time.Sleep(time.Second * 1)
 	for _, s := range stoppers {
@@ -161,14 +118,15 @@ func TestIntegration_InvalidTransaction(t *testing.T) {
 
 	assert.Nil(t, g.Wait())
 
-	ledgers := []*transaction.Ledger{leaderApp.Ledger}
-	for _, f := range followerApps{
-		ledgers = append(ledgers, f.Ledger)
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
+	for _, f := range apps[1:] {
+		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
 	}
 
-	for _, l := range ledgers{
+	for _, l := range ledgers {
 		assert.Equal(t, exp, l.Accounts)
 	}
 	assert.Equal(t, len(errs), 1)
 	assert.True(t, strings.Contains(errs[0].Error(), "Invalid transaction:"))
+	//cleaner()
 }

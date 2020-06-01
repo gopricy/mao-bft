@@ -3,6 +3,7 @@ package mao_utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gopricy/mao-bft/pb"
 )
@@ -25,7 +26,7 @@ func DecodeBlock(bytes []byte) (*pb.Block, error) {
 	return block, err
 }
 
-func EncodeBlock(b *pb.Block) ([]byte, error){
+func EncodeBlock(b *pb.Block) ([]byte, error) {
 	return proto.Marshal(b)
 }
 
@@ -56,7 +57,7 @@ func IsValidBlockHash(block *pb.Block) bool {
 }
 
 func GetLastBlockFromArray(blocks []*pb.Block) *pb.Block {
-	return blocks[len(blocks) - 1]
+	return blocks[len(blocks)-1]
 }
 
 func IsSameBlock(left *pb.Block, right *pb.Block) bool {

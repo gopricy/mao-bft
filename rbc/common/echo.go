@@ -65,7 +65,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 func (c *Common) SendEcho(p *Peer, merkleProof *pb.MerkleProof, data []byte) {
 	payload := &pb.Payload{
 		MerkleProof: merkleProof,
-		Data:        data,
+		Data:        c.Sign(data),
 	}
 
 	/*go func() {

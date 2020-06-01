@@ -60,24 +60,27 @@ func (bc *Blockchain) Reconcile() {
 	if err != nil {
 		log.Fatalln("Fail to reconcile with blocks stored in: " + bc.path)
 	}
+	if len(blockDumps) == 0 {
+		return
+	}
 
 	// 4 internal states to reconstruct from persistent storage.
 	var chain []*pb.Block
 	txStatus := make(map[string]pb.TransactionStatus)
 	staged := make(map[string]*pb.Block)
 	pending := list.New()
+	chain = append(chain, &pb.Block{CurHash: []byte{0}})
 	
 	for _, dump := range blockDumps {
-		if dump.State == pb.BlockState_BS_COMMITTED && dump.Block.Content == nil {
-			// it's a chain head (pre), append to chain.
-			chain = append(chain, dump.Block)
-			continue
-		}
-
 		switch dump.State {
 		case pb.BlockState_BS_COMMITTED:
+			fallthrough
 		case pb.BlockState_BS_PENDING:
+			fallthrough
 		case pb.BlockState_BS_STAGED:
+			if blockMap[dump.State] == nil {
+				blockMap[dump.State] = make(map[string]*pb.Block)
+			}
 			stateMap := blockMap[dump.State]
 			stateMap[hex.EncodeToString(dump.Block.Content.PrevHash)] = dump.Block
 			break
@@ -125,16 +128,25 @@ func (bc *Blockchain) Reconcile() {
 	// Reconstruct TX status.
 	for iter := pending.Front(); iter != nil; iter = iter.Next() {
 		block := iter.Value.(*pb.Block)
+		if block.Content == nil {
+			continue
+		}
 		for _, tx := range block.Content.Txs {
 			txStatus[tx.TransactionUuid] = pb.TransactionStatus_PENDING
 		}
 	}
 	for _, block := range staged {
+		if block.Content == nil {
+			continue
+		}
 		for _, tx := range block.Content.Txs {
 			txStatus[tx.TransactionUuid] = pb.TransactionStatus_STAGED
 		}
 	}
 	for _, block := range chain {
+		if block.Content == nil {
+			continue
+		}
 		for _, tx := range block.Content.Txs {
 			txStatus[tx.TransactionUuid] = pb.TransactionStatus_COMMITTED
 		}
