@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/pkg/errors"
@@ -9,17 +10,20 @@ import (
 
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
-	// TODO: validate after merkle is fixed
-	//valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(req.Data))
-	//if !valid {
-	//	return nil, merkle.InvalidProof{}
-	//}
 	// Echo calls
-	name, err := c.GetNameFromContext(ctx)
-	if err != nil{
-		return nil, errors.Wrap(err, "Can't get name in context")
+	actualData, verified, name := c.Verify(ctx, req.Data)
+	if !verified {
+		return nil, errors.New("signature invalid")
 	}
-	c.Debugf(`Get ECHO Message with data "%.4s" from %s`, req.Data, name)
+
+	c.Debugf(`ECHO Message: "%.4s"`, actualData)
+	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(actualData))
+	if !valid {
+		return nil, merkle.InvalidProof{}
+	}
+	c.Debugf(`Validated by merkle tree`)
+
+	req.Data = actualData
 	e, err := c.EchosReceived.Add(name, req.MerkleProof.Root, req)
 	if err != nil {
 		return nil, err
@@ -77,5 +81,3 @@ func (c *Common) SendEcho(p *Peer, merkleProof *pb.MerkleProof, data []byte) {
 		panic(err)
 	}
 }
-
-
