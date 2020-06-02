@@ -12,5 +12,5 @@ require (
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	google.golang.org/grpc v1.29.1
-	google.golang.org/protobuf v1.23.0 // indirect
+	google.golang.org/protobuf v1.23.0
 )

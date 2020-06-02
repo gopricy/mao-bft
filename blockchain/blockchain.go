@@ -12,6 +12,9 @@ import (
 	"sync"
 )
 
+// if staged is more than this size, a sync should be triggered.
+const MaxStagedBuffer = 3
+
 type Blockchain struct {
 	// This structure stores the blocks in chain.
 	Chain []*pb.Block
@@ -19,6 +22,8 @@ type Blockchain struct {
 	Staged map[string]*pb.Block
 	// This list stores pending blocks that is/will be broadcast. This should be concatenated to Chain.
 	Pending *list.List
+	// Latest staged seen. This is used for sync.
+	LastStaged *pb.Block
 	// A mapping from transaction status to its status.
 	TxStatus map[string]pb.TransactionStatus
 	// Access to blockchain should always be thread-safe.
@@ -160,6 +165,9 @@ func (bc *Blockchain) Reconcile() {
 
 // Add block to staged area, key to it's previous block's CurHash.
 func (bc *Blockchain) addToStagedArea(block *pb.Block, overwrite bool) error {
+	// First mark a block seen as latest staged.
+	bc.LastStaged = block
+
 	hexHash := hex.EncodeToString(block.Content.PrevHash)
 
 	// Write before apply.
@@ -202,26 +210,27 @@ func (bc *Blockchain) setTxsStatus(txs []*pb.Transaction, status pb.TransactionS
 // Block: The block that we're trying to commit.
 // - output
 // 1. Successfully committed new blocks. Empty if nothing gets committed.
-// 2. Error
+// 2. Length of staged area.
+// 3. Error
 // This function is thread safe.
-func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
+func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, bool, error) {
 	bc.Mu.Lock()
 	defer bc.Mu.Unlock()
 
 	// 0. Validate block:
 	// a. Block should have valid hash.
 	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
-		return nil, errors.New("The block is invalid.")
+		return nil, false, errors.New("The block is invalid.")
 	}
 	// b. Skip block if already in staged
 	if _, ok := bc.Staged[hex.EncodeToString(block.Content.PrevHash)]; ok {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// 1. Add the block to staged area in order by sequence number.
 	isLeader := bc.Pending.Len() != 0
 	if err := bc.addToStagedArea(block, isLeader); err != nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	var committed []*pb.Block
@@ -240,7 +249,7 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
 		committed = append(committed, candidate)
 		// Set transaction status only of block is valid.
 		if err := bc.setTxsStatus(candidate.Content.Txs, pb.TransactionStatus_COMMITTED, true); err != nil {
-				return nil, err
+				return nil, false, err
 			}
 
 		// b. Remove from pending if it has. Note that, only leader contains pending section.
@@ -248,7 +257,7 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
 			iter := bc.Pending.Front()
 			nextPending := iter.Value.(*pb.Block)
 			if !mao_utils.IsSameBlock(nextPending, candidate) {
-				return nil, errors.New("Candidate block must be the head of pending.")
+				return nil, false, errors.New("Candidate block must be the head of pending.")
 			}
 			bc.Pending.Remove(iter)
 		}
@@ -257,7 +266,7 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, error) {
 		delete(bc.Staged, hex.EncodeToString(candidate.Content.PrevHash))
 	}
 
-	return committed, nil
+	return committed, len(bc.Staged) > MaxStagedBuffer, nil
 }
 
 // CreateNewPendingBlock creates a block at pending chain. Append the block to pending chain and returns.
@@ -321,4 +330,21 @@ func (bc *Blockchain) GetAllBlocksInOrder() ([]*pb.Block, []bool) {
 	}
 
 	return allBlocks, isBlockCommitted
+}
+
+// GetLastCommittedHash returns the last committed block's hash.
+func (bc *Blockchain) GetLastCommittedHash() string {
+	bc.Mu.RLock()
+	defer bc.Mu.RUnlock()
+	return hex.EncodeToString(mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
+}
+
+// GetLastStagedBlockHash returns the latest staged block's hash.
+func (bc *Blockchain) GetLastStagedBlockHash() string {
+	bc.Mu.RLock()
+	defer bc.Mu.RUnlock()
+	if bc.LastStaged == nil {
+		log.Fatalln("Staged area is empty while calling GetLastStagedBlockHash")
+	}
+	return hex.EncodeToString(bc.LastStaged.CurHash)
 }

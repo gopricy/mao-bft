@@ -69,7 +69,7 @@ func TestCommon_InitWithNonEmptyStorage(t *testing.T) {
 	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_PENDING)
 
 	// Commit 2, this should make pending 2 to staged.
-	committed, err := bc.CommitBlock(pending2)
+	committed, _, err := bc.CommitBlock(pending2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 0)
 	assert.Equal(t, len(bc.TxStatus), 2)

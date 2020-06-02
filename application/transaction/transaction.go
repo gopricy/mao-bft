@@ -16,7 +16,11 @@ const MaximumTxn = 1000000
 type Application interface {
 	// Once a message is RBC'ed, this function will be called to apply this block.
 	// This function should be thread safe.
-	RBCReceive(bytes []byte) error
+	RBCReceive(bytes []byte) (bool, error)
+
+	GetSyncQuestion() (pb.SyncRequest, error)
+	GetSyncAnswer(request pb.SyncRequest) (pb.SyncResponse, error)
+
 	// Get status of a transaction by its uuid.
 	GetTransactionStatus(txUuid string) pb.TransactionStatus
 	// TODO(chenweilunster): Add validation functionality
@@ -33,6 +37,7 @@ type common struct{
 	Ledger *Ledger
 	// PendingLedger stores the ledger after applying all Tx in event queue.
 	PendingLedger *Ledger
+	mu sync.Mutex
 }
 
 func newcommon(dir string) *common{
@@ -50,23 +55,38 @@ func newcommon(dir string) *common{
 
 var _ Application = &common{}
 
-func (c *common) RBCReceive(bytes []byte) error {
+func (c *common) GetSyncQuestion() (pb.SyncRequest, error) {
+	return pb.SyncRequest{
+		LastCommitHash: c.Blockchain.GetLastCommittedHash(),
+		LatestStagedHash: c.Blockchain.GetLastStagedBlockHash(),
+	}, nil
+}
+
+func (c *common) GetSyncAnswer(request pb.SyncRequest) (pb.SyncResponse, error) {
+	return pb.SyncResponse{}, nil
+}
+
+func (c *common) RBCReceive(bytes []byte) (bool, error) {
 	block, err := mao_utils.DecodeBlock(bytes)
 	if err != nil{
-		return errors.Wrap(err, "Can't decode Block")
+		return false, errors.Wrap(err, "Can't decode Block")
 	}
-	blocks, err := c.Blockchain.CommitBlock(block)
+
+	// Below is critical section that only one thread can enter at the same time.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	blocks, shouldSync, err := c.Blockchain.CommitBlock(block)
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, b := range blocks{
 		for _, t := range b.Content.Txs{
 			if err := c.Ledger.CommitTxn(t); err != nil{
-				return err
+				return false, err
 			}
 		}
 	}
-	return nil
+	return shouldSync, nil
 }
 
 func (c *common) GetTransactionStatus(txUuid string) pb.TransactionStatus {

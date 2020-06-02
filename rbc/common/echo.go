@@ -53,9 +53,10 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			//	return nil, err
 			//}
 			c.Infof("Data reconstructed %.6s", data)
-			if err := c.App.RBCReceive(data); err != nil {
+			if _, err := c.App.RBCReceive(data); err != nil {
 				return nil, errors.Wrap(err, "Failed to apply the transaction")
 			}
+			// TODO(Sync): send sync request if is should sync.
 		}
 	}
 	return &pb.EchoResponse{}, nil

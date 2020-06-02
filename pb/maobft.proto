@@ -106,6 +106,19 @@ service Ready{
   rpc Ready(ReadyRequest) returns (ReadyResponse) {}
 }
 
+service Sync {
+  rpc Sync(SyncRequest) returns (SyncResponse) {}
+}
+
+message SyncRequest {
+  string lastCommitHash = 1;
+  string latestStagedHash = 2;
+}
+
+message SyncResponse {
+  repeated bytes response = 1;
+}
+
 message ProposeTransactionRequest {
   Transaction transaction = 1;
   // TODO(chenweilunster): Implement client signature authentication.

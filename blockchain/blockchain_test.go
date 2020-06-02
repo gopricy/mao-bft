@@ -92,7 +92,7 @@ func TestBlockchain_CommitBlock_CommitSingleBlock(t *testing.T) {
 		},
 		mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
 	assert.Nil(t, err)
-	committedBlocks, err := bc.CommitBlock(block)
+	committedBlocks, _, err := bc.CommitBlock(block)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(committedBlocks))
 	assert.Equal(t, bc.Pending.Len(), 0)
@@ -106,7 +106,7 @@ func TestBlockchain_CommitBlock_CommitSingleBlock(t *testing.T) {
 func TestBlockchain_CommitBlock_Commit2Block(t *testing.T) {
 	bc := getSampleBlockchain()
 	candidate := bc.Pending.Front().Value.(*pb.Block)
-	committed, err := bc.CommitBlock(candidate)
+	committed, _, err := bc.CommitBlock(candidate)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 2)
 	assert.Equal(t, committed[0].Content.Txs[0].TransactionUuid, "3")
@@ -126,7 +126,7 @@ func TestBlockchain_CommitBlock_StageOnly(t *testing.T) {
 		},
 		[]byte{1})
 	assert.Nil(t, err)
-	blocks, err := bc.CommitBlock(block)
+	blocks, _, err := bc.CommitBlock(block)
 	assert.Nil(t, err)
 	assert.Equal(t, len(blocks), 0)
 	assert.Equal(t, len(bc.Staged), 2)
@@ -140,13 +140,13 @@ func TestBlockchain_CommitBlock_IdempotentCommit(t *testing.T) {
 		},
 		[]byte{1})
 	assert.Nil(t, err)
-	blocks, err := bc.CommitBlock(block)
+	blocks, _, err := bc.CommitBlock(block)
 	assert.Nil(t, err)
 	assert.Equal(t, len(blocks), 0)
 	assert.Equal(t, len(bc.Staged), 2)
 
 	// Commit again.
-	blocks, err = bc.CommitBlock(block)
+	blocks, _, err = bc.CommitBlock(block)
 	assert.Nil(t, err)
 	assert.Equal(t, len(blocks), 0)
 	assert.Equal(t, len(bc.Staged), 2)
@@ -186,7 +186,7 @@ func TestBlockchain_GetTransactionStatus(t *testing.T) {
 	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_PENDING)
 
 	// Commit 2, this should make pending 2 to staged.
-	committed, err := bc.CommitBlock(pending2)
+	committed, _, err := bc.CommitBlock(pending2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 0)
 	assert.Equal(t, len(bc.TxStatus), 2)
@@ -194,7 +194,7 @@ func TestBlockchain_GetTransactionStatus(t *testing.T) {
 	assert.Equal(t, bc.GetTransactionStatus("1"), pb.TransactionStatus_PENDING)
 
 	// Commit 1, this should make everything committed.
-	committed, err = bc.CommitBlock(pending1)
+	committed, _, err = bc.CommitBlock(pending1)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 2)
 	assert.Equal(t, len(bc.TxStatus), 2)
@@ -232,7 +232,7 @@ func TestBlockchain_Reconcile(t *testing.T) {
 	assert.Equal(t, bc.GetTransactionStatus("2"), pb.TransactionStatus_PENDING)
 
 	// Commit 2, this should make pending 2 to staged.
-	committed, err := bc.CommitBlock(pending2)
+	committed, _, err := bc.CommitBlock(pending2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 0)
 	assert.Equal(t, len(bc.TxStatus), 2)
@@ -244,7 +244,7 @@ func TestBlockchain_Reconcile(t *testing.T) {
 	bc = NewBlockchain(tmpDir)
 
 	// Commit 1, this should make everything committed.
-	committed, err = bc.CommitBlock(pending1)
+	committed, _, err = bc.CommitBlock(pending1)
 	assert.Nil(t, err)
 	assert.Equal(t, len(committed), 2)
 	assert.Equal(t, len(bc.TxStatus), 2)
