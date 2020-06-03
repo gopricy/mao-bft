@@ -111,8 +111,8 @@ service Sync {
 }
 
 message SyncRequest {
-  string lastCommitHash = 1;
-  string latestStagedHash = 2;
+  bytes lastCommit = 1;
+  bytes latestStaged = 2;
 }
 
 message SyncResponse {

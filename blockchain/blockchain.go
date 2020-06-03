@@ -222,8 +222,8 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, bool, error) {
 	if isValid := mao_utils.IsValidBlockHash(block); isValid == false {
 		return nil, false, errors.New("The block is invalid.")
 	}
-	// b. Skip block if already in staged
-	if _, ok := bc.Staged[hex.EncodeToString(block.Content.PrevHash)]; ok {
+	// b. Skip block if already in chain
+	if bc.IsBlockAlreadyInChain(block) {
 		return nil, false, nil
 	}
 
@@ -332,19 +332,69 @@ func (bc *Blockchain) GetAllBlocksInOrder() ([]*pb.Block, []bool) {
 	return allBlocks, isBlockCommitted
 }
 
-// GetLastCommittedHash returns the last committed block's hash.
-func (bc *Blockchain) GetLastCommittedHash() string {
+// GetLastCommitted returns the last committed block's bytes representation.
+func (bc *Blockchain) GetLastCommittedBytes() []byte {
 	bc.Mu.RLock()
 	defer bc.Mu.RUnlock()
-	return hex.EncodeToString(mao_utils.GetLastBlockFromArray(bc.Chain).CurHash)
+	bytes, err := mao_utils.EncodeBlock(mao_utils.GetLastBlockFromArray(bc.Chain))
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	return bytes
 }
 
-// GetLastStagedBlockHash returns the latest staged block's hash.
-func (bc *Blockchain) GetLastStagedBlockHash() string {
+// GetLastStagedBlock returns the latest staged block's bytes representation.
+func (bc *Blockchain) GetLastStagedBlock() []byte {
 	bc.Mu.RLock()
 	defer bc.Mu.RUnlock()
 	if bc.LastStaged == nil {
 		log.Fatalln("Staged area is empty while calling GetLastStagedBlockHash")
 	}
-	return hex.EncodeToString(bc.LastStaged.CurHash)
+	bytes, err := mao_utils.EncodeBlock(bc.LastStaged)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	return bytes
+}
+
+// TODO: Optimize this function to be O(1)
+// IsBlockAlreadyInChain returns whether block is in either staged area or committed area.
+func (bc *Blockchain) IsBlockAlreadyInChain(block *pb.Block) bool {
+	for _, b := range bc.Chain {
+		if mao_utils.IsSameBytes(b.CurHash, block.CurHash) {
+			return true
+		}
+	}
+	for _, b := range bc.Staged {
+		if mao_utils.IsSameBytes(b.CurHash, block.CurHash) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetBlocksForSyncRequest will read the committed chain and try to answer the question.
+// It returns an empty array or nil if not able to answer.
+func (bc *Blockchain) GetAnswerForSyncRequest(lastCommit []byte, latestStaged []byte) []*pb.Block {
+	foundBegin := false
+	lastCommitBlock, err := mao_utils.DecodeBlock(lastCommit)
+	if err != nil {
+		return nil
+	}
+	lastStagedBlock, err := mao_utils.DecodeBlock(latestStaged)
+	if err != nil {
+		return nil
+	}
+	var res []*pb.Block
+	for _, committedBlock := range bc.Chain {
+		if mao_utils.IsSameBlock(committedBlock, lastStagedBlock) {
+			return res
+		}
+		if foundBegin {
+			res = append(res, committedBlock)
+		} else if mao_utils.IsSameBlock(committedBlock, lastCommitBlock) {
+				foundBegin = true
+		}
+	}
+	return nil
 }

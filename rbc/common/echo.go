@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/pkg/errors"
@@ -53,10 +52,13 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			//	return nil, err
 			//}
 			c.Infof("Data reconstructed %.6s", data)
-			if _, err := c.App.RBCReceive(data); err != nil {
+			shouldSync, err := c.App.RBCReceive(data)
+			if  err != nil {
 				return nil, errors.Wrap(err, "Failed to apply the transaction")
 			}
-			// TODO(Sync): send sync request if is should sync.
+			if shouldSync {
+				c.Synchronize()
+			}
 		}
 	}
 	return &pb.EchoResponse{}, nil

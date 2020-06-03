@@ -66,10 +66,13 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			//}
 
 			c.Infof("RBC Receive with data %.4s", data)
-			if _, err := c.App.RBCReceive(data); err != nil {
+			shouldSync, err := c.App.RBCReceive(data)
+			if err != nil {
 				return nil, errors.Wrap(err, "failed to apply the transaction")
 			}
-			// TODO(Sync): Send sync request if it should.
+			if shouldSync {
+				c.Synchronize()
+			}
 		}
 	}
 
