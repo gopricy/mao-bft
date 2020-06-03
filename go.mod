@@ -3,6 +3,7 @@ module github.com/gopricy/mao-bft
 go 1.13
 
 require (
+	github.com/fatih/color v1.9.0
 	github.com/golang/protobuf v1.4.1
 	github.com/google/uuid v1.1.1
 	github.com/klauspost/reedsolomon v1.9.8

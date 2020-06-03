@@ -2,6 +2,9 @@ package common
 
 import (
 	"context"
+	"encoding/hex"
+
+	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/pkg/errors"
@@ -28,9 +31,11 @@ func (c *Common) SendReady(p *Peer, root []byte) {
 // Ready serves ready messages from other nodes
 func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResponse, error) {
 	root, verified, name := c.Verify(ctx, req.MerkleRoot)
-	if !verified{
+	if !verified {
 		return nil, errors.New("invalid signature")
 	}
+	color.Set(color.FgGreen)
+	defer color.Unset()
 
 	c.Debugf(`Get READY from "%s" with root "%.4s"`, name, merkle.MerkleRootToString(req.MerkleRoot))
 
@@ -65,7 +70,7 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 			//	return nil, err
 			//}
 
-			c.Infof("RBC Receive with data %.4s", data)
+			c.Infof("RBC Receive with data %.4s", hex.EncodeToString(data))
 			if _, err := c.App.RBCReceive(data); err != nil {
 				return nil, errors.Wrap(err, "failed to apply the transaction")
 			}

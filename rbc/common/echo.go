@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"encoding/hex"
 
+	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/merkle"
 	"github.com/pkg/errors"
@@ -11,12 +13,14 @@ import (
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
 	// Echo calls
+	color.Set(color.FgYellow)
+	defer color.Unset()
 	actualData, verified, name := c.Verify(ctx, req.Data)
 	if !verified {
 		return nil, errors.New("signature invalid")
 	}
 
-	c.Debugf(`ECHO Message: "%.4s"`, actualData)
+	c.Debugf(`ECHO Message: "%.4s"`, hex.EncodeToString(actualData))
 	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(actualData))
 	if !valid {
 		return nil, merkle.InvalidProof{}

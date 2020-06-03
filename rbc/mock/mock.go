@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
@@ -69,10 +70,10 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	pb.RegisterReadyServer(s, f)
 	pb.RegisterEchoServer(s, f)
 	pb.RegisterPrepareServer(s, f)
-	if g == nil{
-		f.Debugf("Follower %d starts to listen on %s:%d", index, address, p)
+	if g == nil {
+		f.Debugf(color.CyanString("Follower %d starts to listen on %s:%d", index, address, p))
 		err = s.Serve(lis)
-		return err, func(){}
+		return err, func() {}
 	}
 	g.Go(func() error {
 		return s.Serve(lis)
@@ -101,9 +102,9 @@ func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSet
 	pb.RegisterReadyServer(s, l)
 	pb.RegisterPrepareServer(s, l)
 	l.Debugf("Leader RBC starts to listen on %s:%d", address, leaderPort)
-	if g == nil{
+	if g == nil {
 		err = s.Serve(lis)
-		return l, func(){}, nil
+		return l, func() {}, nil
 	}
 	g.Go(func() error {
 		return s.Serve(lis)

@@ -1,6 +1,8 @@
 package leader
 
 import (
+	"encoding/hex"
+
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/erasure"
@@ -38,7 +40,7 @@ func (l *Leader) RBCSend(bytes []byte) {
 
 	i := 0
 	for _, p := range l.AllPeers {
-		l.Infof(`Send PREPARE "%.4s" to %#v`, splits[i], p)
+		l.Infof(`Send PREPARE "%.4s" to %#v`, hex.EncodeToString(splits[i]), p)
 		proof, err := merkle.GetProof(merkleTree, contents[i])
 		if err != nil {
 			panic(err)
