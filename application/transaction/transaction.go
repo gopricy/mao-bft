@@ -7,6 +7,7 @@ import (
 	"github.com/gopricy/mao-bft/rbc/follower"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
+	"log"
 	"sync"
 )
 
@@ -18,8 +19,8 @@ type Application interface {
 	// This function should be thread safe.
 	RBCReceive(bytes []byte) (bool, error)
 
-	GetSyncQuestion() (pb.SyncRequest, error)
-	GetSyncAnswer(request pb.SyncRequest) (pb.SyncResponse, error)
+	GetSyncQuestion() (*pb.SyncRequest, error)
+	GetSyncAnswer(request *pb.SyncRequest) (*pb.SyncResponse, error)
 
 	// Get status of a transaction by its uuid.
 	GetTransactionStatus(txUuid string) pb.TransactionStatus
@@ -55,15 +56,28 @@ func newcommon(dir string) *common{
 
 var _ Application = &common{}
 
-func (c *common) GetSyncQuestion() (pb.SyncRequest, error) {
-	return pb.SyncRequest{
-		LastCommitHash: c.Blockchain.GetLastCommittedHash(),
-		LatestStagedHash: c.Blockchain.GetLastStagedBlockHash(),
+func (c *common) GetSyncQuestion() (*pb.SyncRequest, error) {
+	return &pb.SyncRequest{
+		LastCommit: c.Blockchain.GetLastCommittedBytes(),
+		LatestStaged: c.Blockchain.GetLastStagedBlock(),
 	}, nil
 }
 
-func (c *common) GetSyncAnswer(request pb.SyncRequest) (pb.SyncResponse, error) {
-	return pb.SyncResponse{}, nil
+func (c *common) GetSyncAnswer(request *pb.SyncRequest) (*pb.SyncResponse, error) {
+	ans := c.Blockchain.GetAnswerForSyncRequest(request.LastCommit, request.LatestStaged)
+	if ans == nil || len(ans) == 0 {
+		return nil, errors.New("No answer found.")
+	}
+	res := pb.SyncResponse{}
+	for _, block := range ans {
+		bytes, err := mao_utils.EncodeBlock(block)
+		if err != nil {
+			log.Fatalln("Cannot encode block into bytes: " + err.Error())
+		}
+		res.Response = append(res.Response, bytes)
+	}
+
+	return &res, nil
 }
 
 func (c *common) RBCReceive(bytes []byte) (bool, error) {
@@ -149,7 +163,7 @@ func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
 	}
 	txn := &pb.Transaction{
 		Message: &pb.Transaction_DepositMsg{
-			&pb.DepositMessage{
+			DepositMsg: &pb.DepositMessage{
 				AccountId: id,
 				Amount: int32(dollar * 100 + cents),
 			},

@@ -11,7 +11,7 @@ type Application interface {
 	RBCReceive([]byte) (bool, error)
 
 	// GetSyncQuestion will return sync request constructed from App blockchain.
-	GetSyncQuestion() (pb.SyncRequest, error)
+	GetSyncQuestion() (*pb.SyncRequest, error)
 	// GetSyncAnswer will return sync answer for the corresponding sync question.
-	GetSyncAnswer(request pb.SyncRequest) (pb.SyncResponse, error)
+	GetSyncAnswer(request *pb.SyncRequest) (*pb.SyncResponse, error)
 }
