@@ -48,16 +48,19 @@ func StartFollowers(t *testing.T, apps []common.Application, privKeys []*[64]byt
 	}
 	followerNum := len(apps)
 	for i := 0; i < followerNum; i++ {
-		err, stopper := NewFollower(apps[i], i, privKeys[i], rs, g)
+		err, stopper := NewFollower(apps[i], i+1, privKeys[i], rs, g)
 		assert.Nil(t, err)
 		stoppers = append(stoppers, stopper)
 	}
 	return stoppers
 }
 
+// if g is provided, it is a nonblocking call. if g is nil, it is a blocking call
 func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (error, func()) {
-	f := follower.NewFollower(fmt.Sprintf("f%d", index+1), app, rs.ByzantineLimit, rs.AllPeers, privKey)
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort+index+1))
+	name := fmt.Sprintf("f%d", index)
+	p := rs.AllPeers[name].PORT
+	f := follower.NewFollower(name, app, rs.ByzantineLimit, rs.AllPeers, privKey)
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, p))
 	if err != nil {
 		return err, func() {}
 	}
@@ -66,40 +69,45 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	pb.RegisterReadyServer(s, f)
 	pb.RegisterEchoServer(s, f)
 	pb.RegisterPrepareServer(s, f)
+	if g == nil{
+		f.Debugf("Follower %d starts to listen on %s:%d", index, address, p)
+		err = s.Serve(lis)
+		return err, func(){}
+	}
 	g.Go(func() error {
 		return s.Serve(lis)
 	})
 	return nil, s.GracefulStop
 }
 
-func StartLeader(t *testing.T, app common.Application, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (mao *leader.Leader, stopper func()) {
-	l := leader.NewLeader("mao", app, rs.ByzantineLimit, rs.AllPeers, privKey)
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort))
+func StartLeader(t *testing.T, app common.Application, privKey sign.PrivateKey, rs common.RBCSetting,
+	g *errgroup.Group) (mao *leader.Leader, stopper func()) {
+	mao, stopper, err := NewLeader(app, privKey, rs, g)
 	assert.Nil(t, err)
-	s := grpc.NewServer()
-
-	pb.RegisterEchoServer(s, l)
-	pb.RegisterReadyServer(s, l)
-	pb.RegisterPrepareServer(s, l)
-	g.Go(func() error {
-		return s.Serve(lis)
-	})
-	return l, s.GracefulStop
+	return
 }
 
-func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (mao *leader.Leader, stopper func()) {
+// if g is provided, it is a nonblocking call. if g is nil, it is a blocking call
+func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSetting, g *errgroup.Group) (
+	mao *leader.Leader, stopper func(), err error) {
 	l := leader.NewLeader("mao", app, rs.ByzantineLimit, rs.AllPeers, privKey)
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, leaderPort))
 	if err != nil {
-		return nil, func() {}
+		return nil, func() {}, err
 	}
 	s := grpc.NewServer()
 
 	pb.RegisterEchoServer(s, l)
 	pb.RegisterReadyServer(s, l)
 	pb.RegisterPrepareServer(s, l)
+	l.Debugf("Leader RBC starts to listen on %s:%d", address, leaderPort)
+	if g == nil{
+		err = s.Serve(lis)
+		return l, func(){}, nil
+	}
 	g.Go(func() error {
 		return s.Serve(lis)
 	})
-	return l, s.GracefulStop
+	return l, s.GracefulStop, nil
+
 }

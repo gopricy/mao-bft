@@ -17,6 +17,8 @@ import (
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
 	"github.com/gopricy/mao-bft/rbc/sign"
+	"github.com/op/go-logging"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"io/ioutil"
 	"os"
@@ -82,19 +84,25 @@ func main() {
 		panic(err)
 	}
 	var g errgroup.Group
+	logging.SetLevel(logging.DEBUG, "RBC")
 	switch *t{
 	case "leader":
-		mock.NewLeader(transaction.NewLeader(2, ""), keys[i], rbcSetting, &g)
-		var input string
-		var input2 string
-		n, err := fmt.Scanln(&input, &input2)
-		fmt.Println(n, err, input, "|", input2)
-
-	case "follower":
-		err, _ := mock.NewFollower(transaction.NewFollower(""), i, keys[i], rbcSetting, &g)
+		leaderApp := transaction.NewLeader(1, "")
+		l, s, err := mock.NewLeader(leaderApp, keys[0], rbcSetting, &g)
 		if err != nil{
 			panic(err)
 		}
+		defer s()
+		leaderApp.SetRBCLeader(l)
+		handleUserInput(leaderApp)
+
+	case "follower":
+		err, s := mock.NewFollower(transaction.NewFollower(""), i, keys[i], rbcSetting, nil)
+		defer s()
+		if err != nil{
+			panic(err)
+		}
+
 	default:
 		panic("not supported")
 	}
@@ -105,38 +113,62 @@ func handleUserInput(l *transaction.Leader){
 		var userInput string
 		reader := bufio.NewReader(os.Stdin)
 		userInput, _ = reader.ReadString('\n')
+
+		// three types of commands
 		deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)`)
 		transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+) (?i)from (\S+) (?i)to (\S+)`)
+		getStatus := regexp.MustCompile(`(?i)status (\S+)`)
+
+		// l.GetTransactionStatus()
+
 		dep := deposit.FindSubmatch([]byte(userInput))
 		trans := transfer.FindSubmatch([]byte(userInput))
+		stat := getStatus.FindSubmatch([]byte(userInput))
 
-		if len(dep) != 0{
-			dollar, err := strconv.Atoi(string(dep[1]))
-			if err != nil{
-				fmt.Println("wrong dollar format")
-				continue
+		if len(dep) == 0 && len(trans) == 0 && len(stat) == 0{
+			fmt.Println("invalid command")
+		}
+		fmt.Println(dep, trans, stat)
+		parseNum := func(dollarMatch, centsMatch []byte) (int, int, error){
+			dollar, err := strconv.Atoi(string(dollarMatch))
+			if err != nil {
+				return 0, 0, errors.Wrap(err, "wrong dollar format")
 			}
 			var cents int
-			if len(dep[2]) == 0{
+			if len(dep[2]) == 0 {
 				cents = 0
-			}else{
-				cents, err = strconv.Atoi(string(dep[2]))
-				if err != nil{
-					fmt.Println("wrong cents format")
-					continue
+			} else {
+				cents, err = strconv.Atoi(string(centsMatch))
+				if err != nil {
+					return 0, 0, errors.Wrap(err,"wrong cents format")
 				}
 			}
+			return dollar, cents, nil
+		}
 
-			trans, err := l.ProposeDeposit(string(dep[3]), dollar, cents)
+		if len(dep) != 0{
+			dollar, cents, err := parseNum(dep[1], dep[2])
+			id, err := l.ProposeDeposit(string(dep[3]), dollar, cents)
 			if err != nil{
 				fmt.Println("can't propose the deposit: ", err.Error())
 				continue
 			}
-			fmt.Println("deposit proposed, txnID: ", trans)
+			fmt.Println("deposit proposed, txnID: ", id)
+			continue
 		}
-		if len(dep) == 0 && len(trans) == 0 {
-			fmt.Println("wrong command")
+
+		if len(trans) != 0{
+			dollar, cents, err := parseNum(trans[1], trans[2])
+			id, err := l.ProposeTransfer(string(trans[3]), string(trans[4]), dollar, cents)
+			if err != nil{
+				fmt.Println("can't propose the transfer: ", err.Error())
+				continue
+			}
+			fmt.Println("transfer proposed, txnID: ", id)
+			continue
 		}
-		fmt.Println(dep, trans)
+
+		res := l.GetTransactionStatus(string(stat[1]))
+		fmt.Println("status: " + res.String())
 	}
 }
