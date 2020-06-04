@@ -55,18 +55,16 @@ func (l *Leader) SendPrepare(p *common.Peer, merkleProof *pb.MerkleProof, data [
 		MerkleProof: merkleProof,
 		Data:        l.Sign(data),
 	}
-	/*
-		go func() {
-			for {
-				_, err := pb.NewPrepareClient(p.GetConn()).Prepare(context.Background(), payload)
-				if err == nil {
-					break
-				}
+	go func() {
+		for {
+			_, err := pb.NewPrepareClient(p.GetConn()).Prepare(l.CreateContext(), payload)
+			if err == nil {
+				break
 			}
-		}()
-	*/
-	_, err := pb.NewPrepareClient(p.GetConn()).Prepare(l.CreateContext(), payload)
-	if err != nil {
-		panic(err)
-	}
+		}
+	}()
+	// _, err := pb.NewPrepareClient(p.GetConn()).Prepare(l.CreateContext(), payload)
+	// if err != nil {
+	// 	panic(err)
+	// }
 }

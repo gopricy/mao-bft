@@ -14,18 +14,18 @@ func (c *Common) SendReady(p *Peer, root []byte) {
 	readyReq := &pb.ReadyRequest{
 		MerkleRoot: c.Sign(root),
 	}
-	/*go func() {
+	go func() {
 		for {
-			_, err := pb.NewEchoClient(p.GetConn()).Echo(context.Background(), payload)
+			_, err := pb.NewReadyClient(p.GetConn()).Ready(c.CreateContext(), readyReq)
 			if err == nil {
 				break
 			}
 		}
-	}()*/
-	_, err := pb.NewReadyClient(p.GetConn()).Ready(c.CreateContext(), readyReq)
-	if err != nil {
-		panic(err)
-	}
+	}()
+	// _, err := pb.NewReadyClient(p.GetConn()).Ready(c.CreateContext(), readyReq)
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 // Ready serves ready messages from other nodes

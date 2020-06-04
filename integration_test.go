@@ -2,24 +2,24 @@ package maobft
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/gopricy/mao-bft/application/transaction"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
-	"strings"
-	"testing"
-	"time"
 )
 
 const faultLimit = 1
 const followerNum = faultLimit * 3
 
-
 var trans []string
 
-func init(){
+func init() {
 	logging.SetLevel(logging.DEBUG, "RBC")
 }
 
@@ -58,9 +58,9 @@ func mockInvalidTransactions(leaderApp *transaction.Leader) (map[string]int32, [
 	return expected, errs
 }
 
-func createApps(num int) (res []common.Application){
+func createApps(num int) (res []common.Application) {
 	res = append(res, transaction.NewLeader(1, ""))
-	for i := 0; i < num-1; i ++{
+	for i := 0; i < num-1; i++ {
 		res = append(res, transaction.NewFollower(""))
 	}
 	return
@@ -94,6 +94,39 @@ func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	}
 
 	for _, l := range ledgers {
+		assert.Equal(t, exp, l.Accounts)
+	}
+	//assert.Nil(t, cleaner())
+}
+
+func TestIntegration_OneServerDown(t *testing.T) {
+	var g errgroup.Group
+
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
+	var stoppers []func()
+	apps := createApps(followerNum + 1)
+	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	apps[0].(*transaction.Leader).SetRBCLeader(l)
+	stoppers = append(stoppers, s)
+	ss := mock.StartFollowers(t, apps[1:3], priKeys[1:3], rbcSetting, &g)
+	stoppers = append(stoppers, ss...)
+
+	exp := mockTransactions(apps[0].(*transaction.Leader))
+
+	time.Sleep(time.Second * 1)
+	for i, s := range stoppers {
+		fmt.Println("stop ", i)
+		s()
+	}
+
+	assert.Nil(t, g.Wait())
+
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
+	for _, f := range apps[1:] {
+		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
+	}
+
+	for _, l := range ledgers[:3] {
 		assert.Equal(t, exp, l.Accounts)
 	}
 	//assert.Nil(t, cleaner())

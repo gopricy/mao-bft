@@ -76,16 +76,16 @@ func (c *Common) SendEcho(p *Peer, merkleProof *pb.MerkleProof, data []byte) {
 		Data:        c.Sign(data),
 	}
 
-	/*go func() {
+	go func() {
 		for {
-			_, err := pb.NewEchoClient(p.GetConn()).Echo(context.Background(), payload)
+			_, err := pb.NewEchoClient(p.GetConn()).Echo(c.CreateContext(), payload)
 			if err == nil {
 				break
 			}
 		}
-	}()*/
-	_, err := pb.NewEchoClient(p.GetConn()).Echo(c.CreateContext(), payload)
-	if err != nil {
-		panic(err)
-	}
+	}()
+	// _, err := pb.NewEchoClient(p.GetConn()).Echo(c.CreateContext(), payload)
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
