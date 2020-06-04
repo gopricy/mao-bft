@@ -108,6 +108,24 @@ func main() {
 	}
 }
 
+func handleBalance(l *transaction.Follower){
+	for{
+		var userInput string
+		reader := bufio.NewReader(os.Stdin)
+		userInput, _ = reader.ReadString('\n')
+		getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
+
+		blc := getBalance.FindSubmatch([]byte(userInput))
+
+		if len(blc) == 0{
+			fmt.Println("invalid command")
+		}
+		act := string(blc[1])
+
+		fmt.Println(l.Ledger.Accounts[act])
+	}
+}
+
 func handleUserInput(l *transaction.Leader){
 	for {
 		var userInput string
@@ -118,24 +136,26 @@ func handleUserInput(l *transaction.Leader){
 		deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)`)
 		transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+) (?i)from (\S+) (?i)to (\S+)`)
 		getStatus := regexp.MustCompile(`(?i)status (\S+)`)
+		getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
 
 		// l.GetTransactionStatus()
 
 		dep := deposit.FindSubmatch([]byte(userInput))
 		trans := transfer.FindSubmatch([]byte(userInput))
 		stat := getStatus.FindSubmatch([]byte(userInput))
+		blc := getBalance.FindSubmatch([]byte(userInput))
 
-		if len(dep) == 0 && len(trans) == 0 && len(stat) == 0{
+		if len(dep) == 0 && len(trans) == 0 && len(stat) == 0 && len(blc) == 0{
 			fmt.Println("invalid command")
 		}
-		fmt.Println(dep, trans, stat)
+
 		parseNum := func(dollarMatch, centsMatch []byte) (int, int, error){
 			dollar, err := strconv.Atoi(string(dollarMatch))
 			if err != nil {
 				return 0, 0, errors.Wrap(err, "wrong dollar format")
 			}
 			var cents int
-			if len(dep[2]) == 0 {
+			if len(centsMatch) == 0 {
 				cents = 0
 			} else {
 				cents, err = strconv.Atoi(string(centsMatch))
@@ -168,7 +188,14 @@ func handleUserInput(l *transaction.Leader){
 			continue
 		}
 
-		res := l.GetTransactionStatus(string(stat[1]))
-		fmt.Println("status: " + res.String())
+		if len(stat) != 0{
+			res := l.GetTransactionStatus(string(stat[1]))
+			fmt.Println("status: " + res.String())
+			continue
+		}
+
+		act := string(blc[1])
+		fmt.Println(l.Ledger.Accounts[act])
+
 	}
 }
