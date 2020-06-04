@@ -34,6 +34,10 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 	if !verified {
 		return nil, errors.New("invalid signature")
 	}
+	if !c.PrevHashValid(req.PrevHash, req.MerkleRoot){
+		return nil, errors.New("block with same prevHash already voted")
+	}
+
 	color.Set(color.FgGreen)
 	defer color.Unset()
 

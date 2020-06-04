@@ -20,7 +20,7 @@ type Common interface {
 var _ Common = &common.Common{}
 
 type Mao interface {
-	SendPrepare(*common.Peer, *pb.MerkleProof, []byte)
+	SendPrepare(*common.Peer, *pb.MerkleProof, []byte, []byte)
 	// TODO: we can change it to block
 	RBCSend([]byte)
 	Common
@@ -33,4 +33,3 @@ type MaoFollower interface {
 }
 
 var _MaoFollower = &follower.Follower{}
-

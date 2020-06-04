@@ -19,6 +19,9 @@ func (c *Common) Prepare(ctx context.Context, req *pb.Payload) (*pb.PrepareRespo
 	if !verified {
 		return nil, errors.New("invalid signature")
 	}
+	if !c.PrevHashValid(req.PrevHash, req.MerkleProof.Root){
+		return nil, errors.New("can't vote on two blocks with same prevHash")
+	}
 	for _, p := range c.AllPeers {
 		c.Debugf(`Send ECHO "%.4s" to %#v`, hex.EncodeToString(actualData), p)
 		c.SendEcho(p, req.MerkleProof, actualData)

@@ -23,6 +23,8 @@ type Received struct {
 	mu  sync.Mutex
 }
 
+
+
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
 	defer er.mu.Unlock()
@@ -75,6 +77,7 @@ type Common struct {
 
 	EchosReceived   Received
 	ReadiesReceived Received
+	PrevHashVoted map[string]merkle.RootString
 
 	NodeName    string
 	ReadiesSent sync.Map
@@ -108,6 +111,13 @@ func (c *Common) Verify(ctx context.Context, message []byte) ([]byte, bool, stri
 	}
 	data, verified := sign.Verify(c.AllPeers[name].PubKey, message)
 	return data, verified, name
+}
+
+func (c *Common) PrevHashValid(prevHash []byte, merkleRoot []byte) bool{
+	if root, ok := c.PrevHashVoted[string(prevHash)]; ok{
+		return merkle.MerkleRootToString(merkleRoot) == root
+	}
+	return true
 }
 
 func (c *Common) Sign(message []byte) []byte {

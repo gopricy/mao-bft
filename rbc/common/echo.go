@@ -19,6 +19,9 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 	if !verified {
 		return nil, errors.New("signature invalid")
 	}
+	if !c.PrevHashValid(req.PrevHash, req.MerkleProof.Root){
+		return nil, errors.New("block with same prev_hash already voted")
+	}
 
 	c.Debugf(`ECHO Message: "%.4s"`, hex.EncodeToString(actualData))
 	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(actualData))

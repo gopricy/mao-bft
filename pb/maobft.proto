@@ -29,7 +29,8 @@ message ProofPair {
 
 message Payload{
   MerkleProof merkle_proof = 1;
-  bytes data = 2;
+  bytes prev_hash = 2;
+  bytes data = 3;
 }
 
 enum BlockState {
@@ -90,6 +91,7 @@ message EchoResponse{}
 
 message ReadyRequest{
   bytes merkle_root = 1;
+  bytes prev_hash = 2;
 }
 
 message ReadyResponse{}
