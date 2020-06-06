@@ -13,6 +13,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"regexp"
+	"strconv"
+
 	"github.com/gopricy/mao-bft/application/transaction"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
@@ -20,11 +25,8 @@ import (
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"io/ioutil"
-	"os"
-	"regexp"
-	"strconv"
 )
+
 const rbcSetting = "rbc_setting.json"
 const privateKeys = "private_keys.json"
 
@@ -32,84 +34,84 @@ func main() {
 	t := flag.String("t", "", "type of app")
 	flag.Parse()
 	args := flag.Args()
-	if len(args) != 1{
+	if len(args) != 1 {
 		panic(fmt.Sprintf("only one arg is premitted, either init or index, got %v", args))
 	}
-	write := func(fileName string, content []byte){
+	write := func(fileName string, content []byte) {
 		err := ioutil.WriteFile(fileName, content, 0644)
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
 	}
 
-	if args[0] == "init"{
+	if args[0] == "init" {
 		rbcsetting, allpks, _ := mock.InitPeers(1)
 		bytes, err := json.Marshal(rbcsetting)
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
 		write(rbcSetting, bytes)
 
 		keys, err := json.Marshal(allpks)
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
 		write(privateKeys, keys)
 		return
 	}
 
-
 	i, err := strconv.Atoi(args[0])
-	if err != nil{
+	if err != nil {
 		panic("arg should be int")
 	}
 
 	rbcbytes, err := ioutil.ReadFile(rbcSetting)
-	if err != nil{
+	if err != nil {
 		panic("should call init first")
 	}
 	rbcSetting := common.RBCSetting{}
 	err = json.Unmarshal(rbcbytes, &rbcSetting)
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 
 	var keys []sign.PrivateKey
 	keyBytes, err := ioutil.ReadFile(privateKeys)
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 	err = json.Unmarshal(keyBytes, &keys)
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 	var g errgroup.Group
 	logging.SetLevel(logging.DEBUG, "RBC")
-	switch *t{
+	switch *t {
 	case "leader":
-		leaderApp := transaction.NewLeader(1, "")
+		leaderApp := transaction.NewLeader(1, "persist")
 		l, s, err := mock.NewLeader(leaderApp, keys[0], rbcSetting, &g)
-		if err != nil{
+		defer s()
+		if err != nil {
 			panic(err)
 		}
-		defer s()
 		leaderApp.SetRBCLeader(l)
-		handleUserInput(leaderApp)
+		handleLeaderUserInput(leaderApp)
 
 	case "follower":
-		err, s := mock.NewFollower(transaction.NewFollower(""), i, keys[i], rbcSetting, nil)
+		followerApp := transaction.NewFollower("persist")
+		err, s := mock.NewFollower(followerApp, i, keys[i], rbcSetting, &g)
 		defer s()
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
-
+		handleFollowerUserInput(followerApp)
 	default:
 		panic("not supported")
 	}
 }
 
-func handleBalance(l *transaction.Follower){
-	for{
+func handleBalance(l *transaction.Follower) {
+	for {
 		var userInput string
 		reader := bufio.NewReader(os.Stdin)
 		userInput, _ = reader.ReadString('\n')
@@ -117,7 +119,7 @@ func handleBalance(l *transaction.Follower){
 
 		blc := getBalance.FindSubmatch([]byte(userInput))
 
-		if len(blc) == 0{
+		if len(blc) == 0 {
 			fmt.Println("invalid command")
 		}
 		act := string(blc[1])
@@ -126,76 +128,106 @@ func handleBalance(l *transaction.Follower){
 	}
 }
 
-func handleUserInput(l *transaction.Leader){
+func parseCommand(userInput string) (string, [][]byte) {
+	// three types of commands
+	deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)`)
+	transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+)? (?i)from (\S+) (?i)to (\S+)`)
+	getStatus := regexp.MustCompile(`(?i)status (\S+)`)
+	getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
+
+	dep := deposit.FindSubmatch([]byte(userInput))
+	trans := transfer.FindSubmatch([]byte(userInput))
+	stat := getStatus.FindSubmatch([]byte(userInput))
+	blc := getBalance.FindSubmatch([]byte(userInput))
+	switch {
+	case len(dep) != 0:
+		return "deposit", dep
+	case len(trans) != 0:
+		return "transfer", trans
+	case len(stat) != 0:
+		return "status", stat
+	case len(blc) != 0:
+		return "balance", blc
+	default:
+		return "unknown", nil
+	}
+
+}
+
+func parseNum(dollarMatch, centsMatch []byte) (int, int, error) {
+	dollar, err := strconv.Atoi(string(dollarMatch))
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "wrong dollar format:"+string(dollarMatch))
+	}
+	var cents int
+	if len(centsMatch) == 0 {
+		cents = 0
+	} else {
+		cents, err = strconv.Atoi(string(centsMatch[1:]))
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "wrong cents format:"+string(centsMatch))
+		}
+	}
+	return dollar, cents, nil
+}
+
+func handleLeaderUserInput(l *transaction.Leader) {
 	for {
 		var userInput string
 		reader := bufio.NewReader(os.Stdin)
 		userInput, _ = reader.ReadString('\n')
 
-		// three types of commands
-		deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)`)
-		transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+) (?i)from (\S+) (?i)to (\S+)`)
-		getStatus := regexp.MustCompile(`(?i)status (\S+)`)
-		getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
-
-		// l.GetTransactionStatus()
-
-		dep := deposit.FindSubmatch([]byte(userInput))
-		trans := transfer.FindSubmatch([]byte(userInput))
-		stat := getStatus.FindSubmatch([]byte(userInput))
-		blc := getBalance.FindSubmatch([]byte(userInput))
-
-		if len(dep) == 0 && len(trans) == 0 && len(stat) == 0 && len(blc) == 0{
-			fmt.Println("invalid command")
-		}
-
-		parseNum := func(dollarMatch, centsMatch []byte) (int, int, error){
-			dollar, err := strconv.Atoi(string(dollarMatch))
+		switch t, sub := parseCommand(userInput); t {
+		case "deposit", "transfer":
+			if l == nil {
+				fmt.Println("deposit and transfer can only be proposed by leader")
+				continue
+			}
+			dollar, cents, err := parseNum(sub[1], sub[2])
 			if err != nil {
-				return 0, 0, errors.Wrap(err, "wrong dollar format")
+				fmt.Println("wrong money format", err)
+				continue
 			}
-			var cents int
-			if len(centsMatch) == 0 {
-				cents = 0
+
+			var id string
+			if t == "deposit" {
+				id, err = l.ProposeDeposit(string(sub[3]), dollar, cents)
 			} else {
-				cents, err = strconv.Atoi(string(centsMatch))
-				if err != nil {
-					return 0, 0, errors.Wrap(err,"wrong cents format")
-				}
+				id, err = l.ProposeTransfer(string(sub[3]), string(sub[4]), dollar, cents)
 			}
-			return dollar, cents, nil
-		}
 
-		if len(dep) != 0{
-			dollar, cents, err := parseNum(dep[1], dep[2])
-			id, err := l.ProposeDeposit(string(dep[3]), dollar, cents)
-			if err != nil{
-				fmt.Println("can't propose the deposit: ", err.Error())
+			if err != nil {
+				fmt.Printf("can't propose the %s: %s\n", t, err.Error())
 				continue
 			}
-			fmt.Println("deposit proposed, txnID: ", id)
-			continue
-		}
-
-		if len(trans) != 0{
-			dollar, cents, err := parseNum(trans[1], trans[2])
-			id, err := l.ProposeTransfer(string(trans[3]), string(trans[4]), dollar, cents)
-			if err != nil{
-				fmt.Println("can't propose the transfer: ", err.Error())
-				continue
-			}
-			fmt.Println("transfer proposed, txnID: ", id)
-			continue
-		}
-
-		if len(stat) != 0{
-			res := l.GetTransactionStatus(string(stat[1]))
+			fmt.Printf("%s proposed, txnID: %s \n", t, id)
+		case "status":
+			res := l.GetTransactionStatus(string(sub[1]))
 			fmt.Println("status: " + res.String())
-			continue
+		case "balance":
+			act := string(sub[1])
+			fmt.Printf("%d.%d\n", l.Ledger.Accounts[act]/100, l.Ledger.Accounts[act]%100)
+		default:
+			fmt.Println("unsupported command")
 		}
+	}
+}
 
-		act := string(blc[1])
-		fmt.Println(l.Ledger.Accounts[act])
+func handleFollowerUserInput(f *transaction.Follower) {
+	for {
+		var userInput string
+		reader := bufio.NewReader(os.Stdin)
+		userInput, _ = reader.ReadString('\n')
 
+		switch t, sub := parseCommand(userInput); t {
+		case "status":
+			res := f.GetTransactionStatus(string(sub[1]))
+			fmt.Println("status: " + res.String())
+		case "balance":
+			act := string(sub[1])
+			fmt.Printf("%d.%d\n", f.Ledger.Accounts[act]/100, f.Ledger.Accounts[act]%100)
+		default:
+			fmt.Println("unsupported command")
+		}
 	}
 }
