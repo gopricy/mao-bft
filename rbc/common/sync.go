@@ -48,7 +48,8 @@ func (c *Common) Synchronize() {
 	for _, peer := range c.AllPeers {
 		res, err := c.SendSync(peer)
 		if err != nil {
-			c.Infof("Skip since no valid answer or RPC is rejected for peer: " + peer.Name)
+			c.Infof("Skip since no valid answer or RPC is rejected for peer: " +
+				peer.Name + ". Error is: " + err.Error())
 			continue
 		}
 		for _, bytes := range res.Response {

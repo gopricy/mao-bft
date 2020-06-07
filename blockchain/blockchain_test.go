@@ -254,3 +254,85 @@ func TestBlockchain_Reconcile(t *testing.T) {
 	// Clean up.
 	os.Remove(tmpDir)
 }
+
+func TestBlockchain_GetLastStagedAndCommitBlock(t *testing.T) {
+	bc := NewBlockchain("")
+	lastCommitBlock, err := mao_utils.DecodeBlock(bc.GetLastCommittedBytes())
+
+	// Empty blockchain's last commit should be blockchain head.
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastCommitBlock.CurHash, []byte{0}))
+
+	pending1, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("1", 10, "user1")})
+	pending2, err := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("2", 10, "user2")})
+
+	// Pending chain doesn't affect last commit.
+	lastCommitBlock, err = mao_utils.DecodeBlock(bc.GetLastCommittedBytes())
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastCommitBlock.CurHash, []byte{0}))
+
+	// Commit 2, this should make pending 2 to staged.
+	committed, _, err := bc.CommitBlock(pending2)
+	assert.Equal(t, len(committed), 0)
+	lastCommitBlock, err = mao_utils.DecodeBlock(bc.GetLastCommittedBytes())
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastCommitBlock.CurHash, []byte{0}))
+	lastStagedBlock, err := mao_utils.DecodeBlock(bc.GetLastStagedBlock())
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastStagedBlock.CurHash, pending2.CurHash))
+
+	// Commit 2, this should make all committed
+	committed, _, err = bc.CommitBlock(pending1)
+	assert.Equal(t, len(committed), 2)
+	lastCommitBlock, err = mao_utils.DecodeBlock(bc.GetLastCommittedBytes())
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastCommitBlock.CurHash, pending2.CurHash))
+	lastStagedBlock, err = mao_utils.DecodeBlock(bc.GetLastStagedBlock())
+	assert.Nil(t, err)
+	assert.True(t, mao_utils.IsSameBytes(lastStagedBlock.CurHash, pending1.CurHash))
+}
+
+func TestBlockchain_GetAnswerForSyncRequest(t *testing.T) {
+	bc := NewBlockchain("")
+	pending1, _ := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("1", 10, "user1")})
+	pending2, _ := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("2", 10, "user2")})
+	// Commit 1, 2.
+	_, _, _ = bc.CommitBlock(pending2)
+	_, _, _ = bc.CommitBlock(pending1)
+
+	headBytes, err := mao_utils.EncodeBlock(bc.Chain[0])
+	assert.Nil(t, err)
+	tailBytes := bc.GetLastCommittedBytes()
+	// Get answer with head & pending 2.
+	answerBlocks := bc.GetAnswerForSyncRequest(headBytes, tailBytes)
+	assert.Equal(t, len(answerBlocks), 1)
+	assert.True(t, mao_utils.IsSameBlock(answerBlocks[0], pending1))
+}
+
+func TestBlockchain_GetAnswerForSyncRequest2(t *testing.T) {
+	// In this case we test 3 block in a chain.
+	bc := NewBlockchain("")
+	pending1, _ := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("1", 10, "user1")})
+	pending2, _ := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("2", 10, "user2")})
+	pending3, _ := bc.CreateNewPendingBlock([]*pb.Transaction{
+		constructDepositTransaction("3", 10, "user3")})
+	// Commit 1, 2.
+	_, _, _ = bc.CommitBlock(pending1)
+	_, _, _ = bc.CommitBlock(pending2)
+	_, _, _ = bc.CommitBlock(pending3)
+
+	headBytes, err := mao_utils.EncodeBlock(bc.Chain[0])
+	assert.Nil(t, err)
+	tailBytes := bc.GetLastCommittedBytes()
+	// Get answer with head & pending 3.
+	answerBlocks := bc.GetAnswerForSyncRequest(headBytes, tailBytes)
+	assert.Equal(t, len(answerBlocks), 2)
+	assert.True(t, mao_utils.IsSameBlock(answerBlocks[0], pending1))
+	assert.True(t, mao_utils.IsSameBlock(answerBlocks[1], pending2))
+}
