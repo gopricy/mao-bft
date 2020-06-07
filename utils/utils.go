@@ -61,6 +61,12 @@ func GetLastBlockFromArray(blocks []*pb.Block) *pb.Block {
 }
 
 func IsSameBlock(left *pb.Block, right *pb.Block) bool {
+	// If it's chain head.
+	if left.Content == nil && right.Content == nil &&
+		IsSameBytes(left.CurHash, []byte{0}) && IsSameBytes(right.CurHash, []byte{0}) {
+		return true
+	}
+	// If it's not chain head, then the must have valid & same hash.
 	if !IsSameBytes(left.CurHash, right.CurHash) || !IsValidBlockHash(left) || !IsValidBlockHash(right) {
 		return false
 	}
