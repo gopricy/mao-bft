@@ -13,17 +13,17 @@ import (
 // Echo serves echo messages from other nodes
 func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, error) {
 	// Echo calls
-	color.Set(color.FgYellow)
-	defer color.Unset()
+	c.SetColor(color.FgYellow)
+	defer c.UnsetColor()
 	actualData, verified, name := c.Verify(ctx, req.Data)
 	if !verified {
 		return nil, errors.New("signature invalid")
 	}
-	if !c.PrevHashValid(req.PrevHash, req.MerkleProof.Root){
+	if !c.PrevHashValid(req.PrevHash, req.MerkleProof.Root) {
 		return nil, errors.New("block with same prev_hash already voted")
 	}
-
-	c.Debugf(`ECHO Message: "%.4s"`, hex.EncodeToString(actualData))
+	c.Debugf(`------ECHO Server------`)
+	c.Debugf(`Get ECHO Message: "%.4s" from %s`, hex.EncodeToString(actualData), name)
 	valid := merkle.VerifyProof(req.MerkleProof, merkle.BytesContent(actualData))
 	if !valid {
 		return nil, merkle.InvalidProof{}
@@ -59,7 +59,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			//if err != nil {
 			//	return nil, err
 			//}
-			c.Infof("Data reconstructed %.6s", data)
+			c.Debugf("Data reconstructed %.6s", hex.EncodeToString(data))
 			shouldSync, err := c.App.RBCReceive(data)
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to apply the transaction")
@@ -69,6 +69,7 @@ func (c *Common) Echo(ctx context.Context, req *pb.Payload) (*pb.EchoResponse, e
 			}
 		}
 	}
+
 	return &pb.EchoResponse{}, nil
 }
 

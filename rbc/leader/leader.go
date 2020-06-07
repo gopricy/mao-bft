@@ -46,7 +46,7 @@ func (l *Leader) RBCSend(bytes []byte) {
 
 	i := 0
 	for _, p := range l.AllPeers {
-		l.Infof(`Send PREPARE "%.4s" to %#v`, hex.EncodeToString(splits[i]), p)
+		l.Debugf(`Send PREPARE "%.4s" to %#v`, hex.EncodeToString(splits[i]), p)
 		proof, err := merkle.GetProof(merkleTree, contents[i])
 		if err != nil {
 			panic(err)

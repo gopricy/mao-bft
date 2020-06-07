@@ -17,7 +17,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/application/transaction"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
@@ -130,15 +132,17 @@ func handleBalance(l *transaction.Follower) {
 
 func parseCommand(userInput string) (string, [][]byte) {
 	// three types of commands
-	deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)`)
-	transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+)? (?i)from (\S+) (?i)to (\S+)`)
+	deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)(?:\s*)?`)
+	transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+)? (?i)from (\S+)(?:\s*) (?i)to (\S+)(?:\s*)`)
 	getStatus := regexp.MustCompile(`(?i)status (\S+)`)
 	getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
+	setLevel := regexp.MustCompile(`(?i)level (?i)(INFO|DEBUG)`)
 
 	dep := deposit.FindSubmatch([]byte(userInput))
 	trans := transfer.FindSubmatch([]byte(userInput))
 	stat := getStatus.FindSubmatch([]byte(userInput))
 	blc := getBalance.FindSubmatch([]byte(userInput))
+	level := setLevel.FindSubmatch([]byte(userInput))
 	switch {
 	case len(dep) != 0:
 		return "deposit", dep
@@ -148,6 +152,15 @@ func parseCommand(userInput string) (string, [][]byte) {
 		return "status", stat
 	case len(blc) != 0:
 		return "balance", blc
+	case len(level) != 0:
+		if strings.ToLower(string(level[1])) == "info" {
+			logging.SetLevel(logging.INFO, "RBC")
+			fmt.Println("Level set to INFO")
+			return "level", nil
+		}
+		logging.SetLevel(logging.DEBUG, "RBC")
+		fmt.Println("Level set to DEBUG")
+		return "level", nil
 	default:
 		return "unknown", nil
 	}
@@ -200,12 +213,17 @@ func handleLeaderUserInput(l *transaction.Leader) {
 				fmt.Printf("can't propose the %s: %s\n", t, err.Error())
 				continue
 			}
-			fmt.Printf("%s proposed, txnID: %s \n", t, id)
+			fmt.Println(color.HiCyanString("%s proposed, txnID: %s", t, id))
 		case "status":
 			res := l.GetTransactionStatus(string(sub[1]))
 			fmt.Println("status: " + res.String())
+		case "level":
 		case "balance":
 			act := string(sub[1])
+			if _, ok := l.Ledger.Accounts[act]; !ok {
+				fmt.Println("account not exist")
+				continue
+			}
 			fmt.Printf("%d.%d\n", l.Ledger.Accounts[act]/100, l.Ledger.Accounts[act]%100)
 		default:
 			fmt.Println("unsupported command")
@@ -223,8 +241,13 @@ func handleFollowerUserInput(f *transaction.Follower) {
 		case "status":
 			res := f.GetTransactionStatus(string(sub[1]))
 			fmt.Println("status: " + res.String())
+		case "level":
 		case "balance":
 			act := string(sub[1])
+			if _, ok := f.Ledger.Accounts[act]; !ok {
+				fmt.Println("account not exist")
+				continue
+			}
 			fmt.Printf("%d.%d\n", f.Ledger.Accounts[act]/100, f.Ledger.Accounts[act]%100)
 		default:
 			fmt.Println("unsupported command")

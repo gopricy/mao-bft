@@ -62,6 +62,7 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	p := rs.AllPeers[name].PORT
 	f := follower.NewFollower(name, app, rs.ByzantineLimit, rs.AllPeers, privKey)
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, p))
+
 	if err != nil {
 		return err, func() {}
 	}
@@ -70,11 +71,13 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	pb.RegisterReadyServer(s, f)
 	pb.RegisterEchoServer(s, f)
 	pb.RegisterPrepareServer(s, f)
+	pb.RegisterSyncServer(s, f)
 	if g == nil {
 		f.Debugf(color.CyanString("Follower %d starts to listen on %s:%d", index, address, p))
 		err = s.Serve(lis)
 		return err, func() {}
 	}
+	f.Debugf("RBC Follower starts to listen on %s:%d", address, p)
 	g.Go(func() error {
 		return s.Serve(lis)
 	})
@@ -101,7 +104,8 @@ func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSet
 	pb.RegisterEchoServer(s, l)
 	pb.RegisterReadyServer(s, l)
 	pb.RegisterPrepareServer(s, l)
-	l.Debugf("Leader RBC starts to listen on %s:%d", address, leaderPort)
+	pb.RegisterSyncServer(s, l)
+	l.Debugf("RBC Leader starts to listen on %s:%d", address, leaderPort)
 	if g == nil {
 		err = s.Serve(lis)
 		return l, func() {}, nil

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/rbc/sign"
 
 	"google.golang.org/grpc/metadata"
@@ -22,8 +23,6 @@ type Received struct {
 	rec map[merkle.RootString]map[string]interface{}
 	mu  sync.Mutex
 }
-
-
 
 func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
 	er.mu.Lock()
@@ -77,7 +76,7 @@ type Common struct {
 
 	EchosReceived   Received
 	ReadiesReceived Received
-	PrevHashVoted map[string]merkle.RootString
+	PrevHashVoted   map[string]merkle.RootString
 
 	NodeName    string
 	ReadiesSent sync.Map
@@ -85,7 +84,8 @@ type Common struct {
 	// Below are related to transaction system.
 	App Application
 
-	Logger *logging.Logger
+	Logger           *logging.Logger
+	loggingColorLock sync.Mutex
 
 	// privatekey
 	privateKey *[64]byte
@@ -113,8 +113,8 @@ func (c *Common) Verify(ctx context.Context, message []byte) ([]byte, bool, stri
 	return data, verified, name
 }
 
-func (c *Common) PrevHashValid(prevHash []byte, merkleRoot []byte) bool{
-	if root, ok := c.PrevHashVoted[string(prevHash)]; ok{
+func (c *Common) PrevHashValid(prevHash []byte, merkleRoot []byte) bool {
+	if root, ok := c.PrevHashVoted[string(prevHash)]; ok {
 		return merkle.MerkleRootToString(merkleRoot) == root
 	}
 	return true
@@ -179,4 +179,14 @@ func (c *Common) GetTransactionStatus(
 	ctx context.Context, in *pb.GetTransactionStatusRequest) (*pb.GetTransactionStatusResponse, error) {
 	// TODO(chenweilunster): IMPLEMENT ME
 	return nil, nil
+}
+
+func (c *Common) SetColor(p ...color.Attribute) {
+	c.loggingColorLock.Lock()
+	color.Set(p...)
+}
+
+func (c *Common) UnsetColor() {
+	color.Unset()
+	c.loggingColorLock.Unlock()
 }

@@ -3,8 +3,9 @@ package common
 import (
 	"context"
 	"errors"
-	mao_utils "github.com/gopricy/mao-bft/utils"
 	"log"
+
+	mao_utils "github.com/gopricy/mao-bft/utils"
 
 	"github.com/gopricy/mao-bft/pb"
 )
@@ -58,6 +59,7 @@ func (c *Common) Synchronize() {
 				log.Fatalln("Fail to apply sync's response.")
 			}
 		}
+		c.Infof("Successfully Synced with %s", peer.Name)
 		return
 	}
 }

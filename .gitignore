@@ -17,4 +17,4 @@
 *.json
 
 bin/*
-persist/*
+pst*/*
