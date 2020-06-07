@@ -88,7 +88,7 @@ func main() {
 	logging.SetLevel(logging.DEBUG, "RBC")
 	switch *t {
 	case "leader":
-		leaderApp := transaction.NewLeader(1, "persist")
+		leaderApp := transaction.NewLeader(1, "pstl")
 		l, s, err := mock.NewLeader(leaderApp, keys[0], rbcSetting, &g)
 		defer s()
 		if err != nil {
@@ -98,7 +98,7 @@ func main() {
 		handleLeaderUserInput(leaderApp)
 
 	case "follower":
-		followerApp := transaction.NewFollower("persist")
+		followerApp := transaction.NewFollower(fmt.Sprintf("pstf%d", i))
 		err, s := mock.NewFollower(followerApp, i, keys[i], rbcSetting, &g)
 		defer s()
 		if err != nil {

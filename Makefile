@@ -4,7 +4,10 @@ test:
 build:
 	go build -o bin/demo demo/main.go
 
-init: build
+clean:
+	rm -rf pst*
+
+init: build clean
 	./bin/demo init 
 
 leader: 
