@@ -4,6 +4,9 @@ mao-bft is an efficient byzantine fault tolerance protocol without leader reelec
 [![GoDoc](https://godoc.org/github.com/gopricy/mao-bft?status.svg)](https://pkg.go.dev/github.com/gopricy/mao-bft?tab=doc)
 [![Build Status](https://travis-ci.com/gopricy/mao-bft.svg?branch=master)](https://travis-ci.com/gopricy/mao-bft)
 
+## Demo Video
+https://player.vimeo.com/video/427175579
+
 ## Consensus layer
 We design consensus layer independent from upper application layer, this mean that our BFT algorithm should be able to carry any message. To achieve this, we define the message to be any protobuf payload. In the mean time, each node in the cluster should be http server based on gRPC, we define RPC as below:
 

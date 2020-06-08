@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/fatih/color"
