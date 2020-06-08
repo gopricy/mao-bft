@@ -74,7 +74,7 @@ func (p *Peer) GetConn() *grpc.ClientConn {
 		// 	retry = 8
 		// }
 		// waitTime := int(math.Pow(2, float64(retry)))
-		waitTime := 60
+		waitTime := 300
 		fmt.Println("Connection timeout, retry in ", waitTime, " seconds")
 		time.Sleep(time.Duration(waitTime) * time.Second)
 	}

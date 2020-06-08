@@ -3,7 +3,10 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+
+	"github.com/fatih/color"
 
 	mao_utils "github.com/gopricy/mao-bft/utils"
 
@@ -59,7 +62,7 @@ func (c *Common) Synchronize() {
 				log.Fatalln("Fail to apply sync's response.")
 			}
 		}
-		c.Infof("Successfully Synced with %s", peer.Name)
+		c.Debugf(color.RedString("Successfully Synced with %s", peer.Name))
 		return
 	}
 }
