@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/rbc/sign"
 
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/gopricy/mao-bft/pb"
@@ -20,26 +22,26 @@ import (
 
 type Received struct {
 	// TODO: improve the efficiency with better locking
-	rec map[merkle.RootString]map[string]interface{}
+	Rec map[merkle.RootString]map[string]interface{}
 	mu  sync.Mutex
 }
 
-func (er *Received) Add(ip string, merkleRoot []byte, rec interface{}) (int, error) {
+func (er *Received) Add(ip string, merkleRoot []byte, Rec interface{}) (int, error) {
 	er.mu.Lock()
 	defer er.mu.Unlock()
 	root := merkle.MerkleRootToString(merkleRoot)
-	if er.rec == nil {
-		er.rec = make(map[merkle.RootString]map[string]interface{})
+	if er.Rec == nil {
+		er.Rec = make(map[merkle.RootString]map[string]interface{})
 	}
-	if _, ok := er.rec[root]; !ok {
+	if _, ok := er.Rec[root]; !ok {
 		// if this message hasn't been seen
-		er.rec[root] = make(map[string]interface{})
+		er.Rec[root] = make(map[string]interface{})
 	}
-	if _, ok := er.rec[root][ip]; ok {
-		return len(er.rec[root]), errors.New("Duplicate ECHO from same IP carrying same message")
+	if _, ok := er.Rec[root][ip]; ok {
+		return len(er.Rec[root]), errors.New("Duplicate ECHO from same IP carrying same message")
 	}
-	er.rec[root][ip] = rec
-	return len(er.rec[root]), nil
+	er.Rec[root][ip] = Rec
+	return len(er.Rec[root]), nil
 }
 
 type RBCSetting struct {
@@ -60,13 +62,22 @@ func (p *Peer) GoString() string {
 }
 
 func (p *Peer) GetConn() *grpc.ClientConn {
-	//for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
-	conn, err := createConnection(p.IP, p.PORT)
-	if err == nil {
-		p.CONN = conn
-		//break
+	// retry := 0
+	for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
+		conn, err := createConnection(p.IP, p.PORT)
+		if err == nil {
+			p.CONN = conn
+			break
+		}
+		// retry++
+		// if retry > 8 {
+		// 	retry = 8
+		// }
+		// waitTime := int(math.Pow(2, float64(retry)))
+		waitTime := 60
+		fmt.Println("Connection timeout, retry in ", waitTime, " seconds")
+		time.Sleep(time.Duration(waitTime) * time.Second)
 	}
-	//}
 	return p.CONN
 }
 
@@ -89,6 +100,8 @@ type Common struct {
 
 	// privatekey
 	privateKey *[64]byte
+
+	Mode int
 }
 
 func NewCommon(name string, setting RBCSetting, app Application, privateKey *[64]byte) Common {
@@ -110,6 +123,11 @@ func (c *Common) Verify(ctx context.Context, message []byte) ([]byte, bool, stri
 		return nil, false, ""
 	}
 	data, verified := sign.Verify(c.AllPeers[name].PubKey, message)
+	if verified {
+		c.Debugf("signature verified, signed by %s", name)
+	} else {
+		c.Debugf("signature invalid")
+	}
 	return data, verified, name
 }
 
@@ -126,7 +144,7 @@ func (c *Common) Sign(message []byte) []byte {
 
 func (c *Common) reconstructData(root merkle.RootString) ([]byte, error) {
 	payloads := []*pb.Payload{}
-	for _, m := range c.EchosReceived.rec[root] {
+	for _, m := range c.EchosReceived.Rec[root] {
 		payloads = append(payloads, m.(*pb.Payload))
 	}
 	return erasure.Reconstruct(payloads, c.ByzantineLimit, len(c.AllPeers))
@@ -142,6 +160,10 @@ func (c *Common) readyIsSent(merkleroot []byte) bool {
 
 func (c *Common) Name() string {
 	return c.NodeName
+}
+
+func (c *Common) SetMode(m int) {
+	c.Mode = m
 }
 
 func (c *Common) Debugf(format string, args ...interface{}) {

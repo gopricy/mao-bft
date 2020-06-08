@@ -3,6 +3,8 @@ package common
 import (
 	"context"
 	"encoding/hex"
+	"math"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/pb"
@@ -15,10 +17,19 @@ func (c *Common) SendReady(p *Peer, root []byte) {
 		MerkleRoot: c.Sign(root),
 	}
 	go func() {
+		retry := 0
 		for {
 			_, err := pb.NewReadyClient(p.GetConn()).Ready(c.CreateContext(), readyReq)
 			if err == nil {
 				break
+			}
+			if c.Mode == 4 {
+				retry++
+				if retry > 4 {
+					retry = 4
+				}
+				c.Debugf("SendReady failed. Wait for %d to reconnect.", int(math.Pow(2, float64(retry))))
+				time.Sleep(time.Second * time.Duration(int(math.Pow(2, float64(retry)))))
 			}
 		}
 	}()
@@ -30,17 +41,18 @@ func (c *Common) SendReady(p *Peer, root []byte) {
 
 // Ready serves ready messages from other nodes
 func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResponse, error) {
+	c.SetColor(color.FgGreen)
+	defer c.UnsetColor()
+	c.Debugf(`------Ready Server------`)
 	root, verified, name := c.Verify(ctx, req.MerkleRoot)
 	if !verified {
 		return nil, errors.New("invalid signature")
 	}
+
 	if !c.PrevHashValid(req.PrevHash, req.MerkleRoot) {
 		return nil, errors.New("block with same prevHash already voted")
 	}
 
-	c.SetColor(color.FgGreen)
-	defer c.UnsetColor()
-	c.Debugf(`------Ready Server------`)
 	c.Debugf(`Get READY from "%s" with root "%.4s"`, name, merkle.MerkleRootToString(req.MerkleRoot))
 
 	// TODO: after getting f+1 READY: Send Ready if not Sent
@@ -61,7 +73,7 @@ func (c *Common) Ready(ctx context.Context, req *pb.ReadyRequest) (*pb.ReadyResp
 
 	rootString := merkle.MerkleRootToString(root)
 	if r == 2*c.ByzantineLimit+1 {
-		if len(c.EchosReceived.rec[rootString]) >= len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
+		if len(c.EchosReceived.Rec[rootString]) >= len(c.RBCSetting.AllPeers)-2*c.ByzantineLimit {
 			c.Debugf("Get enough READY and ECHO to decode")
 			data, err := c.reconstructData(rootString)
 			if err != nil {

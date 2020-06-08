@@ -21,6 +21,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gopricy/mao-bft/application/transaction"
+	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
 	"github.com/gopricy/mao-bft/rbc/sign"
@@ -112,59 +113,63 @@ func main() {
 	}
 }
 
-func handleBalance(l *transaction.Follower) {
-	for {
-		var userInput string
-		reader := bufio.NewReader(os.Stdin)
-		userInput, _ = reader.ReadString('\n')
-		getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
-
-		blc := getBalance.FindSubmatch([]byte(userInput))
-
-		if len(blc) == 0 {
-			fmt.Println("invalid command")
-		}
-		act := string(blc[1])
-
-		fmt.Println(l.Ledger.Accounts[act])
-	}
+type handler interface {
+	GetTransactionStatus(string) pb.TransactionStatus
 }
 
-func parseCommand(userInput string) (string, [][]byte) {
+type rbcHandler interface {
+	SetMode(int)
+}
+
+func parseCommand(userInput string, ledger *transaction.Ledger, h handler, rh rbcHandler) (string, [][]byte) {
 	// three types of commands
 	deposit := regexp.MustCompile(`(?i)deposit (\d+)(\.\d+)? (?i)to (\S+)(?:\s*)?`)
 	transfer := regexp.MustCompile(`(?i)transfer (\d+)(\.\d+)? (?i)from (\S+)(?:\s*) (?i)to (\S+)(?:\s*)`)
 	getStatus := regexp.MustCompile(`(?i)status (\S+)`)
 	getBalance := regexp.MustCompile(`(?i)balance (\S+)`)
 	setLevel := regexp.MustCompile(`(?i)level (?i)(INFO|DEBUG)`)
+	byzantineMode := regexp.MustCompile(`(?i)mode (0|1|2|3|4)`)
 
 	dep := deposit.FindSubmatch([]byte(userInput))
 	trans := transfer.FindSubmatch([]byte(userInput))
 	stat := getStatus.FindSubmatch([]byte(userInput))
 	blc := getBalance.FindSubmatch([]byte(userInput))
 	level := setLevel.FindSubmatch([]byte(userInput))
+	mode := byzantineMode.FindSubmatch([]byte(userInput))
 	switch {
 	case len(dep) != 0:
 		return "deposit", dep
 	case len(trans) != 0:
 		return "transfer", trans
 	case len(stat) != 0:
-		return "status", stat
+		res := h.GetTransactionStatus(string(stat[1]))
+		fmt.Println("status: " + res.String())
+		return "handled", nil
 	case len(blc) != 0:
-		return "balance", blc
+		act := string(blc[1])
+		if _, ok := ledger.Accounts[act]; !ok {
+			fmt.Println("account not exist")
+			return "handled", nil
+		}
+		fmt.Printf("%d.%d\n", ledger.Accounts[act]/100, ledger.Accounts[act]%100)
+		return "handled", nil
 	case len(level) != 0:
 		if strings.ToLower(string(level[1])) == "info" {
 			logging.SetLevel(logging.INFO, "RBC")
 			fmt.Println("Level set to INFO")
-			return "level", nil
+			return "handled", nil
 		}
 		logging.SetLevel(logging.DEBUG, "RBC")
 		fmt.Println("Level set to DEBUG")
-		return "level", nil
+		return "handled", nil
+	case len(mode) != 0:
+		m, _ := strconv.Atoi(string(mode[1]))
+		rh.SetMode(m)
+		fmt.Printf("Set byzantine mode to %d\n", m)
+		return "handled", nil
 	default:
 		return "unknown", nil
 	}
-
 }
 
 func parseNum(dollarMatch, centsMatch []byte) (int, int, error) {
@@ -190,7 +195,7 @@ func handleLeaderUserInput(l *transaction.Leader) {
 		reader := bufio.NewReader(os.Stdin)
 		userInput, _ = reader.ReadString('\n')
 
-		switch t, sub := parseCommand(userInput); t {
+		switch t, sub := parseCommand(userInput, l.Ledger, l, l.Leader); t {
 		case "deposit", "transfer":
 			if l == nil {
 				fmt.Println("deposit and transfer can only be proposed by leader")
@@ -214,17 +219,7 @@ func handleLeaderUserInput(l *transaction.Leader) {
 				continue
 			}
 			fmt.Println(color.HiCyanString("%s proposed, txnID: %s", t, id))
-		case "status":
-			res := l.GetTransactionStatus(string(sub[1]))
-			fmt.Println("status: " + res.String())
-		case "level":
-		case "balance":
-			act := string(sub[1])
-			if _, ok := l.Ledger.Accounts[act]; !ok {
-				fmt.Println("account not exist")
-				continue
-			}
-			fmt.Printf("%d.%d\n", l.Ledger.Accounts[act]/100, l.Ledger.Accounts[act]%100)
+		case "handled":
 		default:
 			fmt.Println("unsupported command")
 		}
@@ -237,18 +232,8 @@ func handleFollowerUserInput(f *transaction.Follower) {
 		reader := bufio.NewReader(os.Stdin)
 		userInput, _ = reader.ReadString('\n')
 
-		switch t, sub := parseCommand(userInput); t {
-		case "status":
-			res := f.GetTransactionStatus(string(sub[1]))
-			fmt.Println("status: " + res.String())
-		case "level":
-		case "balance":
-			act := string(sub[1])
-			if _, ok := f.Ledger.Accounts[act]; !ok {
-				fmt.Println("account not exist")
-				continue
-			}
-			fmt.Printf("%d.%d\n", f.Ledger.Accounts[act]/100, f.Ledger.Accounts[act]%100)
+		switch t, _ := parseCommand(userInput, f.Ledger, f, &f.Follower); t {
+		case "handled":
 		default:
 			fmt.Println("unsupported command")
 		}
