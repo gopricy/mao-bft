@@ -4,12 +4,13 @@ import (
 	"container/list"
 	"encoding/hex"
 	"errors"
-	"github.com/golang/protobuf/proto"
-	"github.com/gopricy/mao-bft/pb"
-	mao_utils "github.com/gopricy/mao-bft/utils"
 	"log"
 	"strconv"
 	"sync"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/gopricy/mao-bft/pb"
+	mao_utils "github.com/gopricy/mao-bft/utils"
 )
 
 // if staged is more than this size, a sync should be triggered.
@@ -26,6 +27,7 @@ type Blockchain struct {
 	LastStaged *pb.Block
 	// A mapping from transaction status to its status.
 	TxStatus map[string]pb.TransactionStatus
+	TxMu     sync.RWMutex
 	// Access to blockchain should always be thread-safe.
 	Mu sync.RWMutex
 	// This flag determines whether a blockchain should be persistent (on disk).
@@ -38,7 +40,7 @@ type Blockchain struct {
 
 // NewBlockchain takes in path as parameter, it will return a blockchain with initial state constructed from path.
 // If path is empty string, blockchain
-func NewBlockchain(path string) *Blockchain{
+func NewBlockchain(path string) *Blockchain {
 	res := new(Blockchain)
 	res.Pending = list.New()
 	// The first block in blockchain should have hash of 0 and content nil.
@@ -75,7 +77,7 @@ func (bc *Blockchain) Reconcile() {
 	staged := make(map[string]*pb.Block)
 	pending := list.New()
 	chain = append(chain, &pb.Block{CurHash: []byte{0}})
-	
+
 	for _, dump := range blockDumps {
 		switch dump.State {
 		case pb.BlockState_BS_COMMITTED:
@@ -99,21 +101,21 @@ func (bc *Blockchain) Reconcile() {
 	// Observed committed block.
 	committedSet := make(map[string]bool)
 	tail := hex.EncodeToString(mao_utils.GetLastBlockFromArray(chain).CurHash)
-	for block, contains := committedMap[tail]; contains; block, contains = committedMap[tail]{
-		if len(chain) >= len(committedMap) + 1 {
+	for block, contains := committedMap[tail]; contains; block, contains = committedMap[tail] {
+		if len(chain) >= len(committedMap)+1 {
 			log.Fatalln("Created more committed blocks than what's stored in persistent storage.")
 		}
 		chain = append(chain, block)
 		committedSet[hex.EncodeToString(block.CurHash)] = true
 		tail = hex.EncodeToString(block.CurHash)
 	}
-	if len(chain) != len(committedMap) + 1 { // +1 because chain contains a head.
+	if len(chain) != len(committedMap)+1 { // +1 because chain contains a head.
 		log.Fatalln("There are leftover committed in persistent storage.")
 	}
 
 	// Construct pending. Reuse tail constructed above.
 	pendingMap := blockMap[pb.BlockState_BS_PENDING]
-	for block, contains := pendingMap[tail]; contains; block, contains = pendingMap[tail]{
+	for block, contains := pendingMap[tail]; contains; block, contains = pendingMap[tail] {
 		if pending.Len() >= len(pendingMap) {
 			log.Fatalln("Created more pending blocks than what's stored in persistent storage.")
 		}
@@ -199,7 +201,9 @@ func (bc *Blockchain) setTxsStatus(txs []*pb.Transaction, status pb.TransactionS
 		if ok != overwrite {
 			return errors.New("Transaction status doesn't match overwrite specification" + strconv.FormatBool(overwrite))
 		}
+		bc.TxMu.Lock()
 		bc.TxStatus[tx.TransactionUuid] = status
+		bc.TxMu.Unlock()
 	}
 	return nil
 }
@@ -244,13 +248,11 @@ func (bc *Blockchain) CommitBlock(block *pb.Block) ([]*pb.Block, bool, error) {
 		}
 		bc.Chain = append(bc.Chain, candidate)
 
-
-
 		committed = append(committed, candidate)
 		// Set transaction status only of block is valid.
 		if err := bc.setTxsStatus(candidate.Content.Txs, pb.TransactionStatus_COMMITTED, true); err != nil {
-				return nil, false, err
-			}
+			return nil, false, err
+		}
 
 		// b. Remove from pending if it has. Note that, only leader contains pending section.
 		if bc.Pending.Len() != 0 {
@@ -393,7 +395,7 @@ func (bc *Blockchain) GetAnswerForSyncRequest(lastCommit []byte, latestStaged []
 		if foundBegin {
 			res = append(res, committedBlock)
 		} else if mao_utils.IsSameBlock(committedBlock, lastCommitBlock) {
-				foundBegin = true
+			foundBegin = true
 		}
 	}
 	return nil

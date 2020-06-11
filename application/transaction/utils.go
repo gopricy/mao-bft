@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"container/list"
-	"encoding/hex"
 	"errors"
 	"log"
 	"sync"
@@ -10,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/gopricy/mao-bft/pb"
-	"github.com/op/go-logging"
 )
 
 // #############################################################
@@ -68,7 +66,7 @@ func (l *Ledger) ValidateBlock(block *pb.Block) bool {
 func (l *Ledger) Reconcile(blocks []*pb.Block, isCommit []bool, isCommitLedger bool) {
 	for i, block := range blocks {
 		if !l.ValidateBlock(block) {
-			logging.MustGetLogger("app").Debug("block is not valid or no content, hash is: " + hex.EncodeToString(block.CurHash))
+			// logging.MustGetLogger("app").Debug("block is not valid or no content, hash is: " + hex.EncodeToString(block.CurHash))
 			continue
 		}
 		if isCommitLedger && !isCommit[i] {

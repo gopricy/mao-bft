@@ -1,14 +1,15 @@
 package transaction
 
 import (
+	"log"
+	"sync"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gopricy/mao-bft/blockchain"
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/follower"
 	mao_utils "github.com/gopricy/mao-bft/utils"
 	"github.com/pkg/errors"
-	"log"
-	"sync"
 )
 
 const MaximumTxn = 1000000
@@ -27,21 +28,22 @@ type Application interface {
 	// TODO(chenweilunster): Add validation functionality
 }
 
-type RBCLeader interface{
+type RBCLeader interface {
 	RBCSend(bytes []byte)
 }
 
-type common struct{
-	Queue *EventQueue
+type common struct {
+	Queue      *EventQueue
 	Blockchain *blockchain.Blockchain
 	// Ledger stores the committed states of transactions.
 	Ledger *Ledger
 	// PendingLedger stores the ledger after applying all Tx in event queue.
 	PendingLedger *Ledger
-	mu sync.Mutex
+	mu            sync.Mutex
+	// tstatus       sync.Mutex
 }
 
-func newcommon(dir string) *common{
+func newcommon(dir string) *common {
 	res := new(common)
 	res.Queue = new(EventQueue)
 	res.Ledger = NewLedger()
@@ -58,7 +60,7 @@ var _ Application = &common{}
 
 func (c *common) GetSyncQuestion() (*pb.SyncRequest, error) {
 	return &pb.SyncRequest{
-		LastCommit: c.Blockchain.GetLastCommittedBytes(),
+		LastCommit:   c.Blockchain.GetLastCommittedBytes(),
 		LatestStaged: c.Blockchain.GetLastStagedBlock(),
 	}, nil
 }
@@ -82,7 +84,7 @@ func (c *common) GetSyncAnswer(request *pb.SyncRequest) (*pb.SyncResponse, error
 
 func (c *common) RBCReceive(bytes []byte) (bool, error) {
 	block, err := mao_utils.DecodeBlock(bytes)
-	if err != nil{
+	if err != nil {
 		return false, errors.Wrap(err, "Can't decode Block")
 	}
 
@@ -93,9 +95,9 @@ func (c *common) RBCReceive(bytes []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, b := range blocks{
-		for _, t := range b.Content.Txs{
-			if err := c.Ledger.CommitTxn(t); err != nil{
+	for _, b := range blocks {
+		for _, t := range b.Content.Txs {
+			if err := c.Ledger.CommitTxn(t); err != nil {
 				return false, err
 			}
 		}
@@ -104,24 +106,27 @@ func (c *common) RBCReceive(bytes []byte) (bool, error) {
 }
 
 func (c *common) GetTransactionStatus(txUuid string) pb.TransactionStatus {
-	if c.Queue.Exist(txUuid){
+	if c.Queue.Exist(txUuid) {
 		return pb.TransactionStatus_UNKNOWN
 	}
-	return c.Blockchain.TxStatus[txUuid]
+	c.Blockchain.TxMu.Lock()
+	s := c.Blockchain.TxStatus[txUuid]
+	c.Blockchain.TxMu.Unlock()
+	return s
 }
 
-type Leader struct{
+type Leader struct {
 	Leader RBCLeader
 	*common
 	MaxBlockSize int
-	mu sync.Mutex
+	mu           sync.Mutex
 }
 
-func (l *Leader) SetRBCLeader(leader RBCLeader){
+func (l *Leader) SetRBCLeader(leader RBCLeader) {
 	l.Leader = leader
 }
 
-func NewLeader(blocksize int, dir string) *Leader{
+func NewLeader(blocksize int, dir string) *Leader {
 	res := new(Leader)
 	res.common = newcommon(dir)
 	res.MaxBlockSize = blocksize
@@ -129,16 +134,16 @@ func NewLeader(blocksize int, dir string) *Leader{
 }
 
 // TODO: expose this API in a binary.
-func (l *Leader) ProposeTransfer(from, to string, dollar, cents int) (string, error){
-	if dollar > MaximumTxn || cents >= 100 || cents < 0{
+func (l *Leader) ProposeTransfer(from, to string, dollar, cents int) (string, error) {
+	if dollar > MaximumTxn || cents >= 100 || cents < 0 {
 		return "", errors.New("invalid amount, transaction limit is 1M")
 	}
 	txn := &pb.Transaction{
 		Message: &pb.Transaction_WireMsg{
 			WireMsg: &pb.WireMessage{
 				FromId: from,
-				ToId: to,
-				Amount: int32(dollar * 100 + cents),
+				ToId:   to,
+				Amount: int32(dollar*100 + cents),
 			},
 		},
 	}
@@ -146,35 +151,35 @@ func (l *Leader) ProposeTransfer(from, to string, dollar, cents int) (string, er
 		return "", errors.New("Invalid transaction: " + proto.MarshalTextString(txn))
 	}
 	u, t, err := l.Queue.AddTxToEventQueue(txn, l.PendingLedger)
-	if err != nil{
+	if err != nil {
 		return "", err
 	}
-	if t == l.MaxBlockSize{
-		if err := l.createBlockAndSend(); err != nil{
+	if t == l.MaxBlockSize {
+		if err := l.createBlockAndSend(); err != nil {
 			return "", err
 		}
 	}
 	return u, nil
 }
 
-func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
-	if dollar > MaximumTxn || cents >= 100 || cents < 0{
+func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error) {
+	if dollar > MaximumTxn || cents >= 100 || cents < 0 {
 		return "", errors.New("invalid amount, transaction limit is 1M")
 	}
 	txn := &pb.Transaction{
 		Message: &pb.Transaction_DepositMsg{
 			DepositMsg: &pb.DepositMessage{
 				AccountId: id,
-				Amount: int32(dollar * 100 + cents),
+				Amount:    int32(dollar*100 + cents),
 			},
 		},
 	}
 	u, t, err := l.Queue.AddTxToEventQueue(txn, l.PendingLedger)
-	if err != nil{
+	if err != nil {
 		return "", err
 	}
-	if t == l.MaxBlockSize{
-		if err := l.createBlockAndSend(); err != nil{
+	if t == l.MaxBlockSize {
+		if err := l.createBlockAndSend(); err != nil {
 			return "", err
 		}
 	}
@@ -182,32 +187,32 @@ func (l *Leader) ProposeDeposit(id string, dollar, cents int) (string, error){
 }
 
 // This function is critical section that permits only single entry.
-func (l *Leader) createBlockAndSend() error{
+func (l *Leader) createBlockAndSend() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	txs, err := l.Queue.GetTransactions(l.MaxBlockSize)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	block, err := l.Blockchain.CreateNewPendingBlock(txs)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	enc, err := mao_utils.EncodeBlock(block)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	l.Leader.RBCSend(enc)
 	return nil
 }
 
-type Follower struct{
+type Follower struct {
 	Follower follower.Follower
 	*common
 }
 
-func NewFollower(dir string) *Follower{
+func NewFollower(dir string) *Follower {
 	res := new(Follower)
 	res.common = newcommon(dir)
 	return res

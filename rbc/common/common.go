@@ -67,6 +67,23 @@ func (p *Peer) GetConn() *grpc.ClientConn {
 	}
 	//}
 	return p.CONN
+
+	// for p.CONN == nil || p.CONN.GetState() == connectivity.Shutdown {
+	// 	conn, err := createConnection(p.IP, p.PORT)
+	// 	if err == nil {
+	// 		p.CONN = conn
+	// 		break
+	// 	}
+	// 	// retry++
+	// 	// if retry > 8 {
+	// 	// 	retry = 8
+	// 	// }
+	// 	// waitTime := int(math.Pow(2, float64(retry)))
+	// 	waitTime := 60
+	// 	fmt.Println("Connection timeout, retry in ", waitTime, " seconds")
+	// 	time.Sleep(time.Duration(waitTime) * time.Second)
+	// }
+	// return p.CONN
 }
 
 // Common is a building block of follower and leader
