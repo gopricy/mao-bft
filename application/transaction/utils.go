@@ -2,27 +2,26 @@ package transaction
 
 import (
 	"container/list"
-	"encoding/hex"
 	"errors"
+	"log"
+	"sync"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/gopricy/mao-bft/pb"
-	"log"
-	"sync"
 )
-
 
 // #############################################################
 // Define Wire System
 // #############################################################
 
 // Wire system manages this state machine. This state machine simply tracks account balance of each person.
-type Ledger struct{
+type Ledger struct {
 	Accounts map[string]int32
-	mu sync.RWMutex
+	mu       sync.RWMutex
 }
 
-func NewLedger() *Ledger{
+func NewLedger() *Ledger {
 	res := new(Ledger)
 	res.Accounts = map[string]int32{}
 	return res
@@ -67,7 +66,7 @@ func (l *Ledger) ValidateBlock(block *pb.Block) bool {
 func (l *Ledger) Reconcile(blocks []*pb.Block, isCommit []bool, isCommitLedger bool) {
 	for i, block := range blocks {
 		if !l.ValidateBlock(block) {
-			log.Println("block is not valid or no content, hash is: " + hex.EncodeToString(block.CurHash))
+			// log.Println("block is not valid or no content, hash is: " + hex.EncodeToString(block.CurHash))
 			continue
 		}
 		if isCommitLedger && !isCommit[i] {
@@ -83,7 +82,7 @@ func (l *Ledger) Reconcile(blocks []*pb.Block, isCommit []bool, isCommitLedger b
 	}
 }
 
-func (l *Ledger) GetBalance(act string) (int, bool){
+func (l *Ledger) GetBalance(act string) (int, bool) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -92,11 +91,11 @@ func (l *Ledger) GetBalance(act string) (int, bool){
 }
 
 // CommitTxn will commit an transaction and panic if account ID doesn't exist
-func (l *Ledger) CommitTxn(txn *pb.Transaction) error{
+func (l *Ledger) CommitTxn(txn *pb.Transaction) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	switch v := txn.Message.(type){
+	switch v := txn.Message.(type) {
 	case *pb.Transaction_WireMsg:
 		l.Accounts[v.WireMsg.FromId] -= v.WireMsg.Amount
 		l.Accounts[v.WireMsg.ToId] += v.WireMsg.Amount
@@ -118,33 +117,33 @@ func (l *Ledger) ValidateTransaction(txn *pb.Transaction) bool {
 	defer l.mu.RUnlock()
 
 	switch v := txn.Message.(type) {
-		case *pb.Transaction_WireMsg:
-			// FROM account should exist and not over withdraw.
-			val, ok := l.Accounts[v.WireMsg.FromId]
-			if !ok || v.WireMsg.Amount < 0 || val < v.WireMsg.Amount {
-				return false
-			}
-			// TO account should exist.
-			val, ok = l.Accounts[v.WireMsg.ToId]
-			if !ok {
-				return false
-			}
-			break
-		case *pb.Transaction_DepositMsg:
-			// Deposit should be greater than 0.
-			if v.DepositMsg.Amount < 0 {
-				return false
-			}
-			break
-		default:
+	case *pb.Transaction_WireMsg:
+		// FROM account should exist and not over withdraw.
+		val, ok := l.Accounts[v.WireMsg.FromId]
+		if !ok || v.WireMsg.Amount < 0 || val < v.WireMsg.Amount {
 			return false
 		}
+		// TO account should exist.
+		val, ok = l.Accounts[v.WireMsg.ToId]
+		if !ok {
+			return false
+		}
+		break
+	case *pb.Transaction_DepositMsg:
+		// Deposit should be greater than 0.
+		if v.DepositMsg.Amount < 0 {
+			return false
+		}
+		break
+	default:
+		return false
+	}
 	return true
 }
 
 // A event queue is a double sided queue that buffers the client proposed transaction.
 type EventQueue struct {
-	Q list.List
+	Q  list.List
 	Mu sync.RWMutex
 }
 
@@ -167,7 +166,6 @@ func (q *EventQueue) AddTxToEventQueue(tx *pb.Transaction, pendingLedger *Ledger
 	}
 	uuidStr := id.String()
 	tx.TransactionUuid = uuidStr
-
 
 	q.Q.PushBack(tx)
 	if err := pendingLedger.CommitTxn(tx); err != nil {
@@ -195,13 +193,13 @@ func (q *EventQueue) GetTransactions(maxTx int) ([]*pb.Transaction, error) {
 	return res, nil
 }
 
-func (q *EventQueue) Exist(uuid string) bool{
+func (q *EventQueue) Exist(uuid string) bool {
 	q.Mu.RLock()
 	defer q.Mu.RUnlock()
 
 	p := q.Q.Front()
-	for p != nil{
-		if p.Value.(*pb.Transaction).TransactionUuid == uuid{
+	for p != nil {
+		if p.Value.(*pb.Transaction).TransactionUuid == uuid {
 			return true
 		}
 	}

@@ -2,25 +2,25 @@ package maobft
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/gopricy/mao-bft/application/transaction"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/mock"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
-	"strings"
-	"testing"
-	"time"
 )
 
-const faultLimit = 1
+const faultLimit = 10
 const followerNum = faultLimit * 3
-
 
 var trans []string
 
-func init(){
-	logging.SetLevel(logging.DEBUG, "RBC")
+func init() {
+	logging.SetLevel(logging.WARNING, "RBC")
 }
 
 func mockTransactions(leaderApp *transaction.Leader) map[string]int32 {
@@ -58,9 +58,9 @@ func mockInvalidTransactions(leaderApp *transaction.Leader) (map[string]int32, [
 	return expected, errs
 }
 
-func createApps(num int) (res []common.Application){
+func createApps(num int) (res []common.Application) {
 	res = append(res, transaction.NewLeader(1, ""))
-	for i := 0; i < num-1; i ++{
+	for i := 0; i < num-1; i++ {
 		res = append(res, transaction.NewFollower(""))
 	}
 	return
@@ -72,15 +72,15 @@ func TestIntegration_ValidSingleTxPerBlock(t *testing.T) {
 	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
 	var stoppers []func()
 	apps := createApps(followerNum + 1)
-	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	l, s := mock.StartLeader(apps[0], priKeys[0], rbcSetting, &g)
 	apps[0].(*transaction.Leader).SetRBCLeader(l)
 	stoppers = append(stoppers, s)
-	ss := mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)
+	ss := mock.StartFollowers(apps[1:], priKeys[1:], rbcSetting, &g)
 	stoppers = append(stoppers, ss...)
 
 	exp := mockTransactions(apps[0].(*transaction.Leader))
 
-	time.Sleep(time.Second * 1)
+	// time.Sleep(time.Second * 1)
 	for i, s := range stoppers {
 		fmt.Println("stop ", i)
 		s()
@@ -104,10 +104,10 @@ func TestIntegration_InvalidTransaction(t *testing.T) {
 	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
 	var stoppers []func()
 	apps := createApps(followerNum + 1)
-	l, s := mock.StartLeader(t, apps[0], priKeys[0], rbcSetting, &g)
+	l, s := mock.StartLeader(apps[0], priKeys[0], rbcSetting, &g)
 	apps[0].(*transaction.Leader).SetRBCLeader(l)
 	stoppers = append(stoppers, s)
-	stoppers = append(stoppers, mock.StartFollowers(t, apps[1:], priKeys[1:], rbcSetting, &g)...)
+	stoppers = append(stoppers, mock.StartFollowers(apps[1:], priKeys[1:], rbcSetting, &g)...)
 
 	exp, errs := mockInvalidTransactions(apps[0].(*transaction.Leader))
 
@@ -129,4 +129,42 @@ func TestIntegration_InvalidTransaction(t *testing.T) {
 	assert.Equal(t, len(errs), 1)
 	assert.True(t, strings.Contains(errs[0].Error(), "Invalid transaction:"))
 	//cleaner()
+}
+
+func BenchmarkValidSingleTxPerBlock(b *testing.B) {
+	var g errgroup.Group
+
+	rbcSetting, priKeys, _ := mock.InitPeers(faultLimit)
+	var stoppers []func()
+	apps := createApps(followerNum + 1)
+	l, s := mock.StartLeader(apps[0], priKeys[0], rbcSetting, &g)
+	apps[0].(*transaction.Leader).SetRBCLeader(l)
+	stoppers = append(stoppers, s)
+	ss := mock.StartFollowers(apps[1:], priKeys[1:], rbcSetting, &g)
+	stoppers = append(stoppers, ss...)
+
+	for i := 0; i < b.N; i++ {
+		apps[0].(*transaction.Leader).ProposeDeposit("001", 50, 50)
+	}
+
+	for i, s := range stoppers {
+		fmt.Println("stop ", i)
+		s()
+	}
+
+	if err := g.Wait(); err != nil {
+		b.Error("kuku", err)
+	}
+
+	ledgers := []*transaction.Ledger{apps[0].(*transaction.Leader).Ledger}
+	for _, f := range apps[1:] {
+		ledgers = append(ledgers, f.(*transaction.Follower).Ledger)
+	}
+
+	// for _, l := range ledgers {
+	// 	if !reflect.DeepEqual(exp, l.Accounts) {
+	// 		b.Error("kuku!!!")
+	// 	}
+	// }
+	//assert.Nil(t, cleaner())
 }

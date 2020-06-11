@@ -3,19 +3,17 @@ package mock
 import (
 	"fmt"
 	"net"
-	"testing"
 
 	"github.com/gopricy/mao-bft/pb"
 	"github.com/gopricy/mao-bft/rbc/common"
 	"github.com/gopricy/mao-bft/rbc/follower"
 	"github.com/gopricy/mao-bft/rbc/leader"
 	"github.com/gopricy/mao-bft/rbc/sign"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
-const leaderPort = 8010
+const leaderPort = 7700
 const address = "127.0.0.1"
 
 func InitPeers(byzantineLimit int) (rbcSetting common.RBCSetting, allPrivateKeys []*[64]byte, connCloser func() error) {
@@ -42,14 +40,16 @@ func InitPeers(byzantineLimit int) (rbcSetting common.RBCSetting, allPrivateKeys
 	return
 }
 
-func StartFollowers(t *testing.T, apps []common.Application, privKeys []*[64]byte, rs common.RBCSetting, g *errgroup.Group) (stoppers []func()) {
+func StartFollowers(apps []common.Application, privKeys []*[64]byte, rs common.RBCSetting, g *errgroup.Group) (stoppers []func()) {
 	if len(apps) != len(privKeys) {
 		panic("apps and privKeys should have same length")
 	}
 	followerNum := len(apps)
 	for i := 0; i < followerNum; i++ {
 		err, stopper := NewFollower(apps[i], i+1, privKeys[i], rs, g)
-		assert.Nil(t, err)
+		if err != nil {
+			panic(err)
+		}
 		stoppers = append(stoppers, stopper)
 	}
 	return stoppers
@@ -69,10 +69,10 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	pb.RegisterReadyServer(s, f)
 	pb.RegisterEchoServer(s, f)
 	pb.RegisterPrepareServer(s, f)
-	if g == nil{
+	if g == nil {
 		f.Debugf("Follower %d starts to listen on %s:%d", index, address, p)
 		err = s.Serve(lis)
-		return err, func(){}
+		return err, func() {}
 	}
 	g.Go(func() error {
 		return s.Serve(lis)
@@ -80,10 +80,12 @@ func NewFollower(app common.Application, index int, privKey sign.PrivateKey, rs 
 	return nil, s.GracefulStop
 }
 
-func StartLeader(t *testing.T, app common.Application, privKey sign.PrivateKey, rs common.RBCSetting,
+func StartLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSetting,
 	g *errgroup.Group) (mao *leader.Leader, stopper func()) {
 	mao, stopper, err := NewLeader(app, privKey, rs, g)
-	assert.Nil(t, err)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -101,9 +103,9 @@ func NewLeader(app common.Application, privKey sign.PrivateKey, rs common.RBCSet
 	pb.RegisterReadyServer(s, l)
 	pb.RegisterPrepareServer(s, l)
 	l.Debugf("Leader RBC starts to listen on %s:%d", address, leaderPort)
-	if g == nil{
+	if g == nil {
 		err = s.Serve(lis)
-		return l, func(){}, nil
+		return l, func() {}, nil
 	}
 	g.Go(func() error {
 		return s.Serve(lis)
